@@ -24,6 +24,7 @@ class IncidentCategory(str, Enum):
     SECURITY = "security"
     INFRASTRUCTURE = "infrastructure"
     USER_ACCESS = "user_access"
+    IOS_UPGRADE = "ios_upgrade"
 
 
 class IncidentPriority(str, Enum):
