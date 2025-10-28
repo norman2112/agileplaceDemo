@@ -14,11 +14,13 @@ from src.models.recommendation import (
     ResolutionRecommendation, RecommendationRequest, RecommendationResponse,
     FeedbackRequest, RecommendationFeedback
 )
+from src.models.report import ReportRequest, ReportResponse
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.config_service import ConfigService
 from src.services.recommendation_service import RecommendationService
+from src.services.reporting_service import ReportingService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -36,6 +38,7 @@ _config_service = ConfigService(
     notification_service=_notification_service
 )
 _recommendation_service = RecommendationService(audit_service=_audit_service)
+_reporting_service = ReportingService(audit_service=_audit_service)
 
 
 # Dependency to get services
@@ -62,6 +65,10 @@ async def get_auto_resolution_service() -> AutoResolutionService:
 
 async def get_recommendation_service() -> RecommendationService:
     return _recommendation_service
+
+
+async def get_reporting_service() -> ReportingService:
+    return _reporting_service
 
 
 # Health check endpoint
@@ -403,6 +410,53 @@ async def get_incident_feedback(
     """
     feedback_list = await service.get_feedback_for_incident(incident_id)
     return feedback_list
+
+
+# Reporting Endpoints
+@app.post(
+    "/api/v1/reports/generate",
+    response_model=ReportResponse,
+    tags=["Reporting"],
+    status_code=status.HTTP_200_OK
+)
+async def generate_report(
+    request: ReportRequest,
+    service: ReportingService = Depends(get_reporting_service)
+):
+    """
+    Generate an analytics report based on specified parameters.
+    
+    Supported report types:
+    - resolution_summary: Auto-resolution statistics and success rates
+    - incident_trends: Incident patterns over time by category/priority
+    - performance_metrics: System performance and uptime
+    - recommendation_effectiveness: Recommendation success and coverage rates
+    
+    Time ranges:
+    - last_24_hours, last_7_days, last_30_days, last_90_days
+    - custom: requires start_date and end_date
+    """
+    return await service.generate_report(request)
+
+
+@app.get(
+    "/api/v1/reports/quick-stats",
+    response_model=dict,
+    tags=["Reporting"]
+)
+async def get_quick_stats(
+    service: ReportingService = Depends(get_reporting_service)
+):
+    """
+    Get quick statistics for dashboard view.
+    
+    Returns current metrics including:
+    - Today's incident counts
+    - Auto-resolution statistics
+    - System status
+    - Kill switch state
+    """
+    return await service.get_quick_stats()
 
 
 # Exception handlers
