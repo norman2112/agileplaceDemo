@@ -10,10 +10,15 @@ from src.models.incident import (
 )
 from src.models.audit import AuditLogEntry, AuditQuery
 from src.models.config import AutoResolutionConfig, ConfigUpdateRequest, CategoryConfig
+from src.models.admin import (
+    DashboardUser, DashboardAccessRequest, DashboardAccessResponse,
+    DashboardSettings, ConfigChangeLog, UserRole
+)
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.config_service import ConfigService
+from src.services.dashboard_service import DashboardService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -29,6 +34,10 @@ _notification_service = NotificationService(audit_service=_audit_service)
 _config_service = ConfigService(
     audit_service=_audit_service,
     notification_service=_notification_service
+)
+_dashboard_service = DashboardService(
+    config_service=_config_service,
+    audit_service=_audit_service
 )
 
 
@@ -52,6 +61,10 @@ async def get_auto_resolution_service() -> AutoResolutionService:
         audit_service=_audit_service,
         notification_service=_notification_service
     )
+
+
+async def get_dashboard_service() -> DashboardService:
+    return _dashboard_service
 
 
 # Health check endpoint
@@ -285,6 +298,156 @@ async def get_incident_audit_trail(
     including resolution attempts, notifications, and configuration changes.
     """
     return await service.get_incident_audit_trail(incident_id)
+
+
+# Dashboard Endpoints
+@app.post(
+    "/api/v1/dashboard/auth",
+    response_model=DashboardAccessResponse,
+    tags=["Dashboard"]
+)
+async def authenticate_dashboard_user(
+    request: DashboardAccessRequest,
+    service: DashboardService = Depends(get_dashboard_service)
+):
+    """
+    Authenticate user for dashboard access.
+    
+    TODO: Implement proper authentication with password/token validation.
+    Returns user info, permissions, and dashboard settings.
+    """
+    response = await service.authenticate_user(request.username)
+    
+    if not response:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials or inactive user"
+        )
+    
+    return response
+
+
+@app.get(
+    "/api/v1/dashboard/config",
+    response_model=AutoResolutionConfig,
+    tags=["Dashboard"]
+)
+async def get_dashboard_config(
+    user_id: str,
+    service: DashboardService = Depends(get_dashboard_service)
+):
+    """
+    Get configuration for dashboard display.
+    Requires view_config permission.
+    """
+    try:
+        return await service.get_dashboard_config(user_id)
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@app.get(
+    "/api/v1/dashboard/config-logs",
+    response_model=List[ConfigChangeLog],
+    tags=["Dashboard"]
+)
+async def get_config_change_logs(
+    user_id: str,
+    limit: int = 50,
+    service: DashboardService = Depends(get_dashboard_service)
+):
+    """
+    Get configuration change logs with user attribution.
+    Shows who made what changes and when.
+    Requires view_audit_log permission.
+    """
+    try:
+        return await service.get_config_change_logs(user_id, limit)
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+
+
+@app.put(
+    "/api/v1/dashboard/settings",
+    response_model=DashboardSettings,
+    tags=["Dashboard"]
+)
+async def update_dashboard_settings(
+    user_id: str,
+    settings: DashboardSettings,
+    service: DashboardService = Depends(get_dashboard_service)
+):
+    """Update user-specific dashboard settings (theme, preferences, etc.)."""
+    try:
+        return await service.update_dashboard_settings(user_id, settings)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@app.post(
+    "/api/v1/dashboard/users",
+    response_model=DashboardUser,
+    tags=["Dashboard"]
+)
+async def create_dashboard_user(
+    admin_user_id: str,
+    username: str,
+    email: str,
+    role: UserRole,
+    service: DashboardService = Depends(get_dashboard_service)
+):
+    """
+    Create a new dashboard user.
+    Only system administrators can create users.
+    """
+    try:
+        return await service.create_user(admin_user_id, username, email, role)
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@app.get(
+    "/api/v1/dashboard/users",
+    response_model=List[DashboardUser],
+    tags=["Dashboard"]
+)
+async def get_all_dashboard_users(
+    admin_user_id: str,
+    service: DashboardService = Depends(get_dashboard_service)
+):
+    """
+    Get all dashboard users.
+    Only system administrators can list users.
+    """
+    try:
+        return await service.get_all_users(admin_user_id)
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(e)
+        )
 
 
 # Exception handlers

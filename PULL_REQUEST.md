@@ -1,260 +1,165 @@
-# Pull Request: Incident Auto-Resolution System
+# Pull Request: Admin Configuration Dashboard
 
 ## Summary
-
-Implemented a production-ready auto-resolution system that automatically executes resolution steps for high-confidence incident cases. The system enables IT Operations teams to resolve routine incidents without human intervention while maintaining comprehensive audit trails, real-time notifications, and emergency controls.
-
-**Key Features:**
-- 🎯 Confidence-based resolution (≥90% threshold)
-- 📋 Comprehensive audit logging for all actions
-- 📧 Automatic notifications to incident creators
-- ⚙️ Category-specific configuration management
-- 🚨 Emergency kill switch for immediate disable
+Introduces starter code for the Admin Configuration Dashboard feature, providing role-based access control and configuration management for the AI Resolution Assistant.
 
 ## Context
+This change addresses the AgilePlace card "Admin Configuration Dashboard" which requires:
+- A dashboard for System Administrators to configure AI Resolution Assistant settings
+- Control over which incidents are eligible for auto-classification and resolution
+- Enable/disable functionality for the entire AI system
+- Confidence threshold configuration
+- Category-specific settings
+- Role-based access controls
+- Audit logging of configuration changes with timestamps and user attribution
 
-**AgilePlace Card:** Auto-Resolution for High-Confidence Incidents
+## Implementation
 
-**User Story:**
-> As an IT Operations Manager, I want the system to automatically execute resolution steps for high-confidence cases so that we can resolve routine incidents without human intervention.
+### New Files Created
 
-This implementation addresses all five acceptance criteria defined in the AgilePlace card:
+#### 1. `src/models/admin.py`
+Defines dashboard-specific models:
+- **`UserRole`** enum: SYSTEM_ADMIN, OPERATOR, VIEWER roles
+- **`DashboardUser`**: User model with role-based permissions
+- **`DashboardSettings`**: UI preferences and dashboard configuration
+- **`ConfigChangeLog`**: Detailed logging of configuration changes with user attribution
+- **`DashboardAccessRequest`/`Response`**: Authentication models (stub for future implementation)
 
-1. ✅ System only auto-resolves incidents with ≥90% confidence score
-2. ✅ All auto-resolution actions logged in detail in audit trail
-3. ✅ System notifies incident creator of auto-resolution
-4. ✅ Auto-resolution configurable by incident category
-5. ✅ Emergency kill switch to disable all auto-resolutions immediately
+#### 2. `src/services/dashboard_service.py`
+Core service managing dashboard functionality:
+- **User Authentication**: Basic authentication framework (TODO: implement JWT/OAuth)
+- **Role-Based Permissions**: Granular permission system based on user roles
+  - VIEWER: Read-only access to config and audit logs
+  - OPERATOR: Can edit config and activate kill switch
+  - SYSTEM_ADMIN: Full access including user management
+- **Configuration Management**: User-attributed config changes with audit trail
+- **Dashboard Settings**: Per-user preferences (theme, notifications, etc.)
+- **User Management**: Create and list dashboard users (admin-only)
 
-## Implementation Details
+#### 3. `tests/test_dashboard_service.py`
+Comprehensive test suite covering:
+- User authentication (existing and non-existent users)
+- Role-based permission validation
+- Configuration access with permission checks
+- User creation and duplicate prevention
+- Dashboard settings updates
+- Configuration change log retrieval
 
-### Architecture
+### Modified Files
 
-The system follows a clean, modular architecture built with FastAPI and Python:
+#### `src/api/endpoints.py`
+Added new dashboard endpoints under `/api/v1/dashboard/`:
+- **POST** `/auth` - Authenticate dashboard users
+- **GET** `/config` - View configuration (requires view_config permission)
+- **GET** `/config-logs` - View configuration change history with user attribution
+- **PUT** `/settings` - Update user dashboard preferences
+- **POST** `/users` - Create new dashboard user (admin-only)
+- **GET** `/users` - List all users (admin-only)
 
-```
-src/
-├── models/              # Pydantic data models
-│   ├── incident.py      # Incident and resolution step models
-│   ├── audit.py         # Comprehensive audit log models
-│   └── config.py        # Configuration and kill switch models
-├── services/            # Core business logic
-│   ├── auto_resolution_service.py  # Main auto-resolution engine
-│   ├── audit_service.py            # Detailed audit logging
-│   ├── notification_service.py     # Creator notifications
-│   └── config_service.py           # Configuration & kill switch
-└── api/                 # REST API layer
-    └── endpoints.py     # FastAPI endpoints
-```
+All endpoints include proper:
+- Permission validation
+- Error handling (403 Forbidden, 404 Not Found, 401 Unauthorized)
+- FastAPI dependency injection
+- OpenAPI documentation tags
 
-### Key Classes and Files
+### Architecture Decisions
 
-#### 1. **AutoResolutionService** (`src/services/auto_resolution_service.py`)
-- Core resolution logic with safety checks
-- Validates confidence scores against thresholds (≥90%)
-- Executes resolution steps with detailed tracking
-- Integrates with audit and notification services
+1. **In-Memory Storage**: Current implementation uses in-memory dictionaries for users and settings. This is intentional for starter code - production should use PostgreSQL/MongoDB.
 
-#### 2. **AuditService** (`src/services/audit_service.py`)
-- Logs every action: attempts, successes, failures, skips
-- Provides queryable audit trail by incident, action, date
-- Supports compliance and debugging requirements
+2. **Role-Based Access Control**: Three-tier permission system allows flexible access management:
+   - Separation of concerns between viewing, operating, and administering
+   - Easy to extend with additional roles or granular permissions
 
-#### 3. **NotificationService** (`src/services/notification_service.py`)
-- Notifies incident creators upon auto-resolution
-- Provides detailed resolution summary with step outcomes
-- Ready for integration with email/Slack/PagerDuty
+3. **Audit Trail**: Configuration changes are logged with:
+   - User attribution (user_id and username)
+   - Timestamp
+   - Previous and new values
+   - Action type and config section
 
-#### 4. **ConfigService** (`src/services/config_service.py`)
-- Manages global and category-specific settings
-- Implements emergency kill switch functionality
-- Audits all configuration changes
+4. **Service Layer Pattern**: Follows existing codebase conventions with clear separation between:
+   - Models (data structures)
+   - Services (business logic)
+   - API endpoints (HTTP interface)
 
-#### 5. **API Endpoints** (`src/api/endpoints.py`)
-- RESTful API with comprehensive endpoint coverage
-- Auto-resolution, configuration, audit, and kill switch endpoints
-- Interactive API documentation at `/docs`
-
-### Technical Decisions & Assumptions
-
-1. **In-Memory Storage**: Current implementation uses in-memory storage for audit logs and configuration. In production, this should be replaced with:
-   - PostgreSQL/MongoDB for persistent storage
-   - Redis for caching and message queuing
-
-2. **Confidence Scoring**: System accepts confidence scores from external ML systems. The scoring algorithm itself is outside the scope of this implementation.
-
-3. **Resolution Steps**: Placeholder implementation for actual remediation actions. Production deployment requires integration with:
-   - Ansible/Chef/Puppet for configuration management
-   - Kubernetes/Docker APIs for container orchestration
-   - Cloud provider APIs (AWS, Azure, GCP)
-
-4. **Notification Channels**: Framework in place; requires integration with actual services (SMTP, Slack API, etc.)
-
-5. **Safety-First Design**: Multiple layers of safety checks:
-   - Confidence threshold validation
-   - Category-level enable/disable
-   - Global kill switch
-   - Comprehensive audit logging
-
-### API Endpoints
-
-**Incident Resolution:**
-- `POST /api/v1/incidents/{incident_id}/auto-resolve` - Auto-resolve single incident
-- `POST /api/v1/incidents/batch-resolve` - Batch resolution
-
-**Configuration:**
-- `GET /api/v1/config` - Get current configuration
-- `PUT /api/v1/config` - Update configuration
-- `GET /api/v1/config/category/{category}` - Category config
-
-**Emergency Controls:**
-- `POST /api/v1/config/kill-switch/activate` - EMERGENCY: Disable all auto-resolutions
-- `POST /api/v1/config/kill-switch/deactivate` - Re-enable auto-resolutions
-
-**Audit Logs:**
-- `GET /api/v1/audit` - Query audit logs with filters
-- `GET /api/v1/audit/incident/{incident_id}` - Complete incident audit trail
-
-## Testing / Verification
-
-### Unit Tests
-
-Comprehensive test coverage for all core functionality:
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage report
-pytest --cov=src --cov-report=html
-```
-
-**Test Files:**
-- `tests/test_auto_resolution_service.py` - Auto-resolution logic tests
-  - High-confidence incident resolution
-  - Low-confidence incident rejection
-  - Kill switch enforcement
-  - Category-specific thresholds
-  - Audit trail creation
-  
-- `tests/test_config_service.py` - Configuration management tests
-  - Kill switch activation/deactivation
-  - Configuration updates
-  - Audit logging for config changes
+## Test Notes
 
 ### Manual Testing
+To verify the dashboard functionality:
 
-1. **Start the server:**
+1. **Start the API server:**
    ```bash
    python main.py
    ```
 
-2. **Access API documentation:**
-   - Navigate to `http://localhost:8000/docs`
-   - Interactive Swagger UI for testing all endpoints
-
-3. **Test auto-resolution:**
+2. **Test authentication:**
    ```bash
-   # Create high-confidence incident and attempt resolution
-   curl -X POST "http://localhost:8000/api/v1/incidents/INC-001/auto-resolve" \
+   curl -X POST http://localhost:8000/api/v1/dashboard/auth \
      -H "Content-Type: application/json" \
-     -d '{
-       "incident_id": "INC-001",
-       "title": "Database connection issue",
-       "category": "database",
-       "priority": "high",
-       "confidence_score": 0.95,
-       "created_by": "user123"
-     }'
+     -d '{"username": "admin"}'
    ```
 
-4. **Test kill switch:**
+3. **View configuration (use user_id from auth response):**
    ```bash
-   # Activate kill switch
-   curl -X POST "http://localhost:8000/api/v1/config/kill-switch/activate?actor=admin&reason=Testing"
-   
-   # Verify resolution is blocked
-   # (Repeat step 3 - should be rejected)
-   
-   # Deactivate kill switch
-   curl -X POST "http://localhost:8000/api/v1/config/kill-switch/deactivate?actor=admin"
+   curl http://localhost:8000/api/v1/dashboard/config?user_id=admin-001
    ```
 
-5. **Verify audit trail:**
+4. **Create a new user:**
    ```bash
-   # Get audit logs for incident
-   curl "http://localhost:8000/api/v1/audit/incident/INC-001"
+   curl -X POST "http://localhost:8000/api/v1/dashboard/users?admin_user_id=admin-001&username=operator1&email=op@example.com&role=operator"
    ```
 
-### Acceptance Criteria Verification
+5. **View API documentation:**
+   Navigate to http://localhost:8000/docs to see all dashboard endpoints with interactive testing
 
-| Criteria | Verification Method | Location |
-|----------|-------------------|----------|
-| ≥90% confidence threshold | Unit tests + `can_auto_resolve()` validation | `test_auto_resolution_service.py::test_cannot_auto_resolve_low_confidence` |
-| Detailed audit logging | All actions create audit entries | `test_auto_resolution_service.py::test_audit_trail_created` |
-| Incident creator notification | Notification sent on resolution | `NotificationService.notify_auto_resolution()` |
-| Category-based configuration | Per-category settings respected | `test_auto_resolution_service.py::test_category_specific_threshold` |
-| Emergency kill switch | Immediate disable functionality | `test_config_service.py::test_kill_switch_activation` |
+### Automated Testing
+Run the test suite:
+```bash
+pytest tests/test_dashboard_service.py -v
+```
 
-## Related Work
+Tests verify:
+- ✓ Default admin user authentication
+- ✓ Non-existent user rejection
+- ✓ Role-based permission assignment
+- ✓ Configuration access with permissions
+- ✓ User creation and duplicate prevention
+- ✓ Dashboard settings management
 
-### Dependencies
+## TODO for Full Implementation
 
-All dependencies listed in `requirements.txt`:
-- **FastAPI** - Modern web framework for APIs
-- **Pydantic** - Data validation and settings management
-- **Uvicorn** - ASGI server
-- **Pytest** - Testing framework
+### High Priority
+- [ ] Implement proper authentication (JWT tokens, OAuth2, or SAML)
+- [ ] Add database persistence (replace in-memory storage)
+- [ ] Implement actual configuration updates via dashboard
+- [ ] Add password hashing and secure credential storage
 
-### Future Enhancements
+### Medium Priority
+- [ ] Build web UI (React/Vue) for dashboard
+- [ ] Add real-time WebSocket notifications for config changes
+- [ ] Implement category-specific configuration updates through dashboard
+- [ ] Add audit log export functionality (CSV, JSON)
+- [ ] Session management and token refresh
 
-The following items are prepared for but require additional implementation:
+### Low Priority
+- [ ] Multi-factor authentication support
+- [ ] Rate limiting for API endpoints
+- [ ] Advanced audit log filtering and search
+- [ ] Dashboard analytics and metrics
 
-1. **ML Model Integration**: Connect external confidence scoring system
-2. **Persistent Storage**: Migrate from in-memory to database storage
-3. **Real Notification Systems**: Integrate email/Slack/PagerDuty
-4. **Resolution Playbooks**: Implement actual remediation logic per category
-5. **Authentication**: Add OAuth2/JWT for API security
-6. **Monitoring**: Prometheus metrics and Sentry error tracking
-7. **Web UI**: Dashboard for monitoring and configuration
+## Security Considerations
 
-### Blockers
+- Authentication is currently a stub - **DO NOT deploy without proper auth**
+- Passwords are not yet implemented - needed before production
+- Consider adding API rate limiting for auth endpoints
+- Implement HTTPS/TLS for all dashboard communications
+- Add CSRF protection for state-changing operations
+- Consider audit log immutability (append-only storage)
 
-None. System is ready for deployment with the caveat that production integrations (database, notifications, remediation scripts) need to be configured per environment.
+## Breaking Changes
+None - this is a new feature addition with no modifications to existing functionality.
 
-### Migration Path
-
-To deploy to production:
-
-1. Configure persistent database (PostgreSQL recommended)
-2. Set up notification integrations (email/Slack/PagerDuty)
-3. Implement resolution playbooks for each incident category
-4. Configure authentication and authorization
-5. Set up monitoring and alerting
-6. Review and adjust confidence thresholds per category
-7. Test thoroughly in staging environment
-8. Deploy with kill switch activated initially
-9. Gradually enable per category after validation
-
----
-
-## Checklist
-
-- [x] All acceptance criteria met
-- [x] Unit tests written and passing
-- [x] API documentation complete
-- [x] README updated with usage examples
-- [x] Code follows Python PEP 8 standards
-- [x] Error handling implemented
-- [x] Audit logging comprehensive
-- [x] Configuration management complete
-- [x] Kill switch functional
-- [x] Notification framework in place
-
-## Questions for Reviewers
-
-1. Should we adjust the default confidence threshold from 90% for any specific categories?
-2. Which notification channels should we prioritize for production integration?
-3. What database should we use for production (PostgreSQL, MongoDB, or other)?
-4. Are there specific remediation tools/platforms we should integrate with first?
-5. Should we implement role-based access control for the kill switch?
+## Dependencies
+No new dependencies required. Uses existing:
+- FastAPI for API endpoints
+- Pydantic for data validation
+- pytest for testing
