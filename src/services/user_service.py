@@ -1,5 +1,6 @@
 from fastapi import HTTPException, status
 from src.models.user import UserProfile
+from typing import Optional
 
 async def reset_user_password(user_id: str, email: str):
     # Placeholder logic for resetting password
@@ -24,3 +25,9 @@ async def update_user_profile(user_id: str, profile: UserProfile):
         "message": "User profile updated.",
         "updated_profile": profile
     }
+
+async def authenticate_user(email: str, password: str) -> Optional[UserProfile]:
+    # Placeholder logic for authenticating a user
+    if email == "test@example.com" and password == "password":
+        return UserProfile(user_id="123", email=email)
+    return None
