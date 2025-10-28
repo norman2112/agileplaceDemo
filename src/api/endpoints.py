@@ -1,7 +1,4 @@
-"""
-FastAPI endpoints for auto-resolution system.
-"""
-from typing import List, Optional
+from typing import List, Optional, Dict
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.responses import JSONResponse
 
@@ -21,6 +18,7 @@ from src.services.notification_service import NotificationService
 from src.services.config_service import ConfigService
 from src.services.recommendation_service import RecommendationService
 from src.services.reporting_service import ReportingService
+from src.services.dashboard_service import DashboardService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -39,7 +37,7 @@ _config_service = ConfigService(
 )
 _recommendation_service = RecommendationService(audit_service=_audit_service)
 _reporting_service = ReportingService(audit_service=_audit_service)
-
+_dashboard_service = DashboardService()
 
 # Dependency to get services
 async def get_audit_service() -> AuditService:
@@ -71,6 +69,51 @@ async def get_reporting_service() -> ReportingService:
     return _reporting_service
 
 
+# Dashboard Endpoints
+@app.post(
+    "/api/v1/dashboard/{user_id}/add-widget",
+    tags=["Dashboard"]
+)
+async def add_dashboard_widget(
+    user_id: str,
+    widget_data: Dict,
+):
+    _dashboard_service.add_widget(user_id, widget_data)
+    return {"status": "Widget added", "user_id": user_id}
+
+@app.post(
+    "/api/v1/dashboard/{user_id}/remove-widget",
+    tags=["Dashboard"]
+)
+async def remove_dashboard_widget(
+    user_id: str,
+    widget_id: str,
+):
+    _dashboard_service.remove_widget(user_id, widget_id)
+    return {"status": "Widget removed", "user_id": user_id}
+
+@app.post(
+    "/api/v1/dashboard/{user_id}/rearrange-widget",
+    tags=["Dashboard"]
+)
+async def rearrange_dashboard_widget(
+    user_id: str,
+    widget_id: str,
+    new_position: int,
+):
+    _dashboard_service.rearrange_widget(user_id, widget_id, new_position)
+    return {"status": "Widget rearranged", "user_id": user_id}
+
+@app.get(
+    "/api/v1/dashboard/{user_id}",
+    tags=["Dashboard"]
+)
+async def get_dashboard(
+    user_id: str,
+):
+    dashboard = _dashboard_service.get_dashboard(user_id)
+    return {"dashboard": dashboard, "user_id": user_id}
+
 # Health check endpoint
 @app.get("/health", tags=["Health"])
 async def health_check():
@@ -80,7 +123,6 @@ async def health_check():
         "service": "auto-resolution-system",
         "version": "1.0.0"
     }
-
 
 # Incident Resolution Endpoints
 @app.post(
@@ -141,7 +183,6 @@ async def batch_auto_resolve(
         results.append(result)
     
     return results
-
 
 # Configuration Endpoints
 @app.get(
@@ -303,7 +344,6 @@ async def get_incident_audit_trail(
     """
     return await service.get_incident_audit_trail(incident_id)
 
-
 # Resolution Recommendation Endpoints
 @app.post(
     "/api/v1/incidents/{incident_id}/recommendations",
@@ -411,7 +451,6 @@ async def get_incident_feedback(
     feedback_list = await service.get_feedback_for_incident(incident_id)
     return feedback_list
 
-
 # Reporting Endpoints
 @app.post(
     "/api/v1/reports/generate",
@@ -457,7 +496,6 @@ async def get_quick_stats(
     - Kill switch state
     """
     return await service.get_quick_stats()
-
 
 # Exception handlers
 @app.exception_handler(HTTPException)
