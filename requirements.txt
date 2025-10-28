@@ -1,0 +1,27 @@
+# Core dependencies
+fastapi==0.104.1
+pydantic==2.5.0
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# Async support
+aiofiles==23.2.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.1
+
+# Logging and monitoring
+python-json-logger==2.0.7
+
+# Optional: Production dependencies (uncomment as needed)
+# gunicorn==21.2.0  # Production WSGI server
+# prometheus-client==0.19.0  # Metrics
+# sentry-sdk==1.38.0  # Error tracking
+# redis==5.0.1  # Caching and message queue
+# sqlalchemy==2.0.23  # Database ORM
+# alembic==1.12.1  # Database migrations
+# psycopg2-binary==2.9.9  # PostgreSQL driver
+# python-jose[cryptography]==3.3.0  # JWT tokens
+# passlib[bcrypt]==1.7.4  # Password hashing
