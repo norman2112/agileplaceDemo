@@ -248,3 +248,94 @@ class ReportingService:
             "system_status": "operational",
             "kill_switch_active": False
         }
+    
+    async def get_report_by_id(self, report_id: str) -> Optional[ReportResponse]:
+        """
+        Retrieve a previously generated report by ID.
+        
+        TODO: Implement report storage and retrieval.
+        - Store generated reports in database or cache
+        - Retrieve by report_id
+        - Handle report expiration/TTL
+        
+        Args:
+            report_id: Unique report identifier
+            
+        Returns:
+            Report if found, None otherwise
+        """
+        logger.info(f"Retrieving report: {report_id}")
+        
+        # Stub implementation - replace with actual storage retrieval
+        return None
+    
+    async def list_reports(
+        self,
+        report_type: Optional[ReportType] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> list[dict]:
+        """
+        List previously generated reports with pagination.
+        
+        TODO: Implement report listing.
+        - Query report metadata from storage
+        - Filter by report type if provided
+        - Support pagination
+        - Return lightweight metadata (not full report data)
+        
+        Args:
+            report_type: Optional filter by report type
+            limit: Maximum number of reports to return
+            offset: Number of reports to skip
+            
+        Returns:
+            List of report metadata dictionaries
+        """
+        logger.info(f"Listing reports (type={report_type}, limit={limit}, offset={offset})")
+        
+        # Stub implementation - replace with actual storage query
+        return []
+    
+    async def export_report(self, report_id: str, format: str) -> Optional[dict]:
+        """
+        Export a report in the specified format.
+        
+        TODO: Implement report export.
+        - Retrieve report by ID
+        - Convert to requested format (JSON/CSV/PDF)
+        - For CSV: flatten nested structures
+        - For PDF: format with charts/tables
+        - Return appropriate headers and content
+        
+        Args:
+            report_id: Unique report identifier
+            format: Export format (json, csv, pdf)
+            
+        Returns:
+            Export data with content and headers, None if report not found
+        """
+        logger.info(f"Exporting report {report_id} as {format}")
+        
+        # Stub implementation - replace with actual export logic
+        return None
+    
+    async def delete_report(self, report_id: str) -> bool:
+        """
+        Delete a generated report.
+        
+        TODO: Implement report deletion.
+        - Remove report from storage
+        - Log deletion for audit trail
+        - Handle cascading deletions if needed
+        
+        Args:
+            report_id: Unique report identifier
+            
+        Returns:
+            True if deleted, False if not found
+        """
+        logger.info(f"Deleting report: {report_id}")
+        
+        # Stub implementation - replace with actual deletion
+        return False

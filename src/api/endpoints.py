@@ -459,6 +459,133 @@ async def get_quick_stats(
     return await service.get_quick_stats()
 
 
+@app.get(
+    "/api/v1/reports/{report_id}",
+    response_model=ReportResponse,
+    tags=["Reporting"]
+)
+async def get_report(
+    report_id: str,
+    service: ReportingService = Depends(get_reporting_service)
+):
+    """
+    Retrieve a previously generated report by ID.
+    
+    Useful for:
+    - Reviewing historical reports
+    - Comparing reports over time
+    - Sharing report links with stakeholders
+    """
+    report = await service.get_report_by_id(report_id)
+    
+    if not report:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report {report_id} not found"
+        )
+    
+    return report
+
+
+@app.get(
+    "/api/v1/reports",
+    response_model=List[dict],
+    tags=["Reporting"]
+)
+async def list_reports(
+    report_type: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+    service: ReportingService = Depends(get_reporting_service)
+):
+    """
+    List previously generated reports with pagination.
+    
+    Supports filtering by:
+    - Report type
+    - Generation date
+    
+    Returns report metadata without full data for performance.
+    """
+    report_type_enum = None
+    if report_type:
+        try:
+            report_type_enum = ReportType(report_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid report type: {report_type}"
+            )
+    
+    return await service.list_reports(
+        report_type=report_type_enum,
+        limit=limit,
+        offset=offset
+    )
+
+
+@app.get(
+    "/api/v1/reports/{report_id}/export",
+    tags=["Reporting"]
+)
+async def export_report(
+    report_id: str,
+    format: str = "json",
+    service: ReportingService = Depends(get_reporting_service)
+):
+    """
+    Export a report in specified format.
+    
+    Supported formats:
+    - json: JSON format (default)
+    - csv: CSV spreadsheet
+    - pdf: PDF document
+    
+    Returns downloadable file for sharing and archival.
+    """
+    if format not in ["json", "csv", "pdf"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported format: {format}. Use json, csv, or pdf"
+        )
+    
+    export_data = await service.export_report(report_id, format)
+    
+    if not export_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report {report_id} not found"
+        )
+    
+    return export_data
+
+
+@app.delete(
+    "/api/v1/reports/{report_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Reporting"]
+)
+async def delete_report(
+    report_id: str,
+    service: ReportingService = Depends(get_reporting_service)
+):
+    """
+    Delete a generated report.
+    
+    Use for cleaning up old reports or removing incorrect data.
+    Note: This only deletes the report, not the underlying audit data.
+    """
+    success = await service.delete_report(report_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Report {report_id} not found"
+        )
+    
+    return None
+
+
 # Exception handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
