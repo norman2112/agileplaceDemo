@@ -17,6 +17,9 @@ class AuditAction(str, Enum):
     KILL_SWITCH_ACTIVATED = "kill_switch_activated"
     KILL_SWITCH_DEACTIVATED = "kill_switch_deactivated"
     CONFIG_UPDATED = "config_updated"
+    RECOMMENDATION_REQUESTED = "recommendation_requested"
+    RECOMMENDATIONS_GENERATED = "recommendations_generated"
+    RECOMMENDATION_FEEDBACK = "recommendation_feedback"
 
 
 class AuditLogEntry(BaseModel):
