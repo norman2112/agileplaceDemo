@@ -78,6 +78,11 @@ class ReportingService:
                 start_date, end_date
             )
         
+        elif request.report_type == ReportType.USAGE_REPORT:
+            report_data["usage_report"] = await self._generate_usage_report(
+                start_date, end_date, request.department_filter
+            )
+
         # Create response
         response = ReportResponse(
             report_id=str(uuid4()),
@@ -228,6 +233,27 @@ class ReportingService:
             average_rating=None,
             coverage_rate=0.0
         )
+    
+    async def _generate_usage_report(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        department_filter: Optional[str]
+    ) -> dict:
+        """
+        Generate usage report.
+        TODO: Implement logic to:
+        - Query login frequency by user and department
+        - Display feature usage statistics
+        - Filter data by date range
+        """
+        logger.info(f"Generating usage report from {start_date} to {end_date}")
+        # Stub implementation - replace with actual data queries
+        return {
+            "login_frequency": {},
+            "feature_usage_statistics": {},
+            "department": department_filter
+        }
     
     async def get_quick_stats(self) -> dict:
         """
