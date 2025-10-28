@@ -10,10 +10,15 @@ from src.models.incident import (
 )
 from src.models.audit import AuditLogEntry, AuditQuery
 from src.models.config import AutoResolutionConfig, ConfigUpdateRequest, CategoryConfig
+from src.models.recommendation import (
+    ResolutionRecommendation, RecommendationRequest, RecommendationResponse,
+    FeedbackRequest, RecommendationFeedback
+)
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.config_service import ConfigService
+from src.services.recommendation_service import RecommendationService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -30,6 +35,7 @@ _config_service = ConfigService(
     audit_service=_audit_service,
     notification_service=_notification_service
 )
+_recommendation_service = RecommendationService(audit_service=_audit_service)
 
 
 # Dependency to get services
@@ -52,6 +58,10 @@ async def get_auto_resolution_service() -> AutoResolutionService:
         audit_service=_audit_service,
         notification_service=_notification_service
     )
+
+
+async def get_recommendation_service() -> RecommendationService:
+    return _recommendation_service
 
 
 # Health check endpoint
@@ -285,6 +295,114 @@ async def get_incident_audit_trail(
     including resolution attempts, notifications, and configuration changes.
     """
     return await service.get_incident_audit_trail(incident_id)
+
+
+# Resolution Recommendation Endpoints
+@app.post(
+    "/api/v1/incidents/{incident_id}/recommendations",
+    response_model=RecommendationResponse,
+    tags=["Recommendations"],
+    status_code=status.HTTP_200_OK
+)
+async def get_recommendations_for_incident(
+    incident_id: str,
+    incident: Incident,
+    request: Optional[RecommendationRequest] = None,
+    service: RecommendationService = Depends(get_recommendation_service)
+):
+    """
+    Get resolution recommendations for a classified incident.
+    
+    Requirements:
+    - Returns suggestions within 10 seconds
+    - Provides step-by-step resolution instructions
+    - Ranks suggestions by historical success rate
+    - Target: Suggest at least one resolution for 75% of classified incidents
+    
+    Returns ranked list of resolution recommendations based on historical data.
+    """
+    if incident.incident_id != incident_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incident ID in path does not match incident data"
+        )
+    
+    max_recommendations = request.max_recommendations if request else 5
+    min_success_rate = request.min_success_rate if request else 0.5
+    
+    response = await service.get_recommendations(
+        incident=incident,
+        max_recommendations=max_recommendations,
+        min_success_rate=min_success_rate
+    )
+    
+    return response
+
+
+@app.post(
+    "/api/v1/recommendations/feedback",
+    response_model=RecommendationFeedback,
+    tags=["Recommendations"],
+    status_code=status.HTTP_201_CREATED
+)
+async def submit_recommendation_feedback(
+    feedback: FeedbackRequest,
+    service: RecommendationService = Depends(get_recommendation_service)
+):
+    """
+    Submit feedback on recommendation effectiveness.
+    
+    Engineers can provide feedback on:
+    - Whether the recommendation was helpful
+    - Whether it was applied
+    - Whether it successfully resolved the incident
+    - How long resolution took
+    - Additional comments
+    
+    This feedback is used to improve future recommendations and update success rates.
+    """
+    result = await service.submit_feedback(feedback)
+    return result
+
+
+@app.get(
+    "/api/v1/recommendations/{recommendation_id}/stats",
+    response_model=dict,
+    tags=["Recommendations"]
+)
+async def get_recommendation_stats(
+    recommendation_id: str,
+    service: RecommendationService = Depends(get_recommendation_service)
+):
+    """
+    Get aggregated statistics for a specific recommendation.
+    
+    Returns:
+    - Total feedback count
+    - Times applied
+    - Success rate
+    - Average rating
+    """
+    stats = await service.get_feedback_stats(recommendation_id)
+    return stats
+
+
+@app.get(
+    "/api/v1/incidents/{incident_id}/feedback",
+    response_model=List[RecommendationFeedback],
+    tags=["Recommendations"]
+)
+async def get_incident_feedback(
+    incident_id: str,
+    service: RecommendationService = Depends(get_recommendation_service)
+):
+    """
+    Get all feedback for recommendations related to a specific incident.
+    
+    Useful for tracking which recommendations were tried and their outcomes.
+    """
+    feedback_list = await service.get_feedback_for_incident(incident_id)
+    return feedback_list
 
 
 # Exception handlers

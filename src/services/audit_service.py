@@ -242,3 +242,57 @@ class AuditService:
         """Get complete audit trail for a specific incident."""
         query = AuditQuery(incident_id=incident_id, limit=1000)
         return await self.query_audit_log(query)
+    
+    async def log_recommendation_request(
+        self,
+        incident_id: str,
+        category: str
+    ) -> AuditLogEntry:
+        """Log that recommendations were requested for an incident."""
+        return await self.log_entry(
+            incident_id=incident_id,
+            action=AuditAction.RECOMMENDATION_REQUESTED,
+            details={
+                "message": "Resolution recommendations requested",
+                "category": category
+            }
+        )
+    
+    async def log_recommendations_generated(
+        self,
+        incident_id: str,
+        count: int,
+        processing_time_ms: int
+    ) -> AuditLogEntry:
+        """Log that recommendations were successfully generated."""
+        return await self.log_entry(
+            incident_id=incident_id,
+            action=AuditAction.RECOMMENDATIONS_GENERATED,
+            details={
+                "message": "Resolution recommendations generated",
+                "count": count,
+                "processing_time_ms": processing_time_ms
+            },
+            success=True
+        )
+    
+    async def log_recommendation_feedback(
+        self,
+        feedback_id: str,
+        recommendation_id: str,
+        incident_id: str,
+        rating: str,
+        was_successful: bool
+    ) -> AuditLogEntry:
+        """Log feedback submitted for a recommendation."""
+        return await self.log_entry(
+            incident_id=incident_id,
+            action=AuditAction.RECOMMENDATION_FEEDBACK,
+            details={
+                "message": "Recommendation feedback submitted",
+                "feedback_id": feedback_id,
+                "recommendation_id": recommendation_id,
+                "rating": rating,
+                "was_successful": was_successful
+            }
+        )
