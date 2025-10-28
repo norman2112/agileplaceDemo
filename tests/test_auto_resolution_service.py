@@ -191,3 +191,28 @@ async def test_audit_trail_created(auto_resolution_service, high_confidence_inci
     # Verify audit entries exist for this incident
     incident_audits = await audit_service.get_incident_audit_trail(high_confidence_incident.incident_id)
     assert len(incident_audits) > 0
+
+
+@pytest.mark.asyncio
+async def test_ios_upgrade_incident_resolution(auto_resolution_service):
+    """Test that iOS upgrade incidents have appropriate resolution steps."""
+    ios_incident = Incident(
+        incident_id="INC-IOS-001",
+        title="iOS upgrade compatibility issue",
+        description="App fails to build after iOS 17 upgrade",
+        category=IncidentCategory.IOS_UPGRADE,
+        priority=IncidentPriority.HIGH,
+        confidence_score=0.93,
+        created_by="ios_developer"
+    )
+    
+    result = await auto_resolution_service.resolve_incident(ios_incident)
+    
+    assert result.success is True
+    assert result.incident_id == ios_incident.incident_id
+    assert len(result.resolution_steps) > 0
+    
+    # Verify iOS-specific resolution steps are present
+    step_descriptions = [step.description for step in result.resolution_steps]
+    assert any("iOS version" in desc for desc in step_descriptions)
+    assert any("bundle" in desc.lower() or "cache" in desc.lower() for desc in step_descriptions)

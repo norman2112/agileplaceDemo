@@ -210,6 +210,13 @@ class AutoResolutionService:
                 {"description": "Check application logs", "action": "log_check"},
                 {"description": "Restart application service", "action": "service_restart"},
                 {"description": "Verify application health", "action": "health_check"}
+            ],
+            "ios_upgrade": [
+                {"description": "Check iOS version compatibility", "action": "ios_version_check"},
+                {"description": "Verify app bundle and provisioning profiles", "action": "bundle_verification"},
+                {"description": "Clear derived data and build cache", "action": "cache_clear"},
+                {"description": "Validate API compatibility with iOS version", "action": "api_compatibility_check"},
+                {"description": "Run automated iOS build test", "action": "build_test"}
             ]
         }
         
