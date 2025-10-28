@@ -459,6 +459,23 @@ async def get_quick_stats(
     return await service.get_quick_stats()
 
 
+### BMC New User Story Endpoint
+
+# Add a new minimal endpoint to reflect the BMC New User Story.
+
+@app.post(
+    "/api/v1/bmc/user-story",
+    response_model=dict,
+    tags=["BMC"],
+    status_code=status.HTTP_200_OK
+)
+async def bmc_new_user_story():
+    """
+    Handle BMC New User Story operations.
+    """
+    return {"message": "BMC New User Story endpoint reached."}
+
+
 # Exception handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
