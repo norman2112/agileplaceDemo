@@ -15,12 +15,17 @@ from src.models.recommendation import (
     FeedbackRequest, RecommendationFeedback
 )
 from src.models.report import ReportRequest, ReportResponse
+from src.models.platform import (
+    DevicePlatform, PlatformType, PlatformStatus,
+    PlatformMigrationRequest, PlatformMigrationResponse
+)
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.config_service import ConfigService
 from src.services.recommendation_service import RecommendationService
 from src.services.reporting_service import ReportingService
+from src.services.platform_service import PlatformService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -39,6 +44,7 @@ _config_service = ConfigService(
 )
 _recommendation_service = RecommendationService(audit_service=_audit_service)
 _reporting_service = ReportingService(audit_service=_audit_service)
+_platform_service = PlatformService(audit_service=_audit_service)
 
 
 # Dependency to get services
@@ -69,6 +75,10 @@ async def get_recommendation_service() -> RecommendationService:
 
 async def get_reporting_service() -> ReportingService:
     return _reporting_service
+
+
+async def get_platform_service() -> PlatformService:
+    return _platform_service
 
 
 # Health check endpoint
@@ -457,6 +467,130 @@ async def get_quick_stats(
     - Kill switch state
     """
     return await service.get_quick_stats()
+
+
+# Platform Management Endpoints (Samsung Bada Refactoring)
+@app.post(
+    "/api/v1/platforms/register",
+    response_model=DevicePlatform,
+    tags=["Platform Management"],
+    status_code=status.HTTP_201_CREATED
+)
+async def register_platform(
+    platform: DevicePlatform,
+    service: PlatformService = Depends(get_platform_service)
+):
+    """
+    Register a new device platform.
+    
+    Supports registration of various platform types including
+    legacy platforms like Samsung Bada.
+    """
+    return await service.register_platform(platform)
+
+
+@app.get(
+    "/api/v1/platforms",
+    response_model=List[DevicePlatform],
+    tags=["Platform Management"]
+)
+async def list_platforms(
+    platform_type: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    service: PlatformService = Depends(get_platform_service)
+):
+    """
+    List all registered platforms with optional filters.
+    
+    Filters:
+    - platform_type: Filter by platform type (bada, tizen, android, etc.)
+    - status_filter: Filter by status (active, deprecated, discontinued, legacy)
+    """
+    pt = PlatformType(platform_type) if platform_type else None
+    ps = PlatformStatus(status_filter) if status_filter else None
+    
+    return await service.list_platforms(platform_type=pt, status=ps)
+
+
+@app.get(
+    "/api/v1/platforms/legacy",
+    response_model=List[DevicePlatform],
+    tags=["Platform Management"]
+)
+async def get_legacy_platforms(
+    service: PlatformService = Depends(get_platform_service)
+):
+    """
+    Get all legacy and discontinued platforms.
+    
+    Useful for identifying platforms requiring migration.
+    """
+    return await service.get_legacy_platforms()
+
+
+@app.get(
+    "/api/v1/platforms/{platform_id}",
+    response_model=DevicePlatform,
+    tags=["Platform Management"]
+)
+async def get_platform(
+    platform_id: str,
+    service: PlatformService = Depends(get_platform_service)
+):
+    """Get details for a specific platform."""
+    platform = await service.get_platform(platform_id)
+    
+    if not platform:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Platform {platform_id} not found"
+        )
+    
+    return platform
+
+
+@app.post(
+    "/api/v1/platforms/migrate",
+    response_model=PlatformMigrationResponse,
+    tags=["Platform Management"],
+    status_code=status.HTTP_200_OK
+)
+async def migrate_legacy_platform(
+    request: PlatformMigrationRequest,
+    service: PlatformService = Depends(get_platform_service)
+):
+    """
+    Migrate incidents from legacy platform to modern platform.
+    
+    Example: Migrating Samsung Bada incidents to Tizen.
+    
+    Supports dry-run mode for testing before actual migration.
+    """
+    return await service.migrate_legacy_platform(request)
+
+
+@app.post(
+    "/api/v1/platforms/{platform_id}/deprecate",
+    response_model=DevicePlatform,
+    tags=["Platform Management"]
+)
+async def deprecate_platform(
+    platform_id: str,
+    actor: str,
+    service: PlatformService = Depends(get_platform_service)
+):
+    """
+    Mark a platform as deprecated.
+    
+    Use when a platform is being phased out but still supported.
+    """
+    try:
+        return await service.deprecate_platform(platform_id, actor)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
 
 
 # Exception handlers
