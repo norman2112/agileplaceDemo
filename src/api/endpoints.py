@@ -10,10 +10,12 @@ from src.models.incident import (
 )
 from src.models.audit import AuditLogEntry, AuditQuery
 from src.models.config import AutoResolutionConfig, ConfigUpdateRequest, CategoryConfig
+from src.models.bmc import BMCRecord, BMCRecordRequest, BMCRecordResponse, BMCRecordStatus
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.config_service import ConfigService
+from src.services.bmc_service import BMCService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -30,6 +32,7 @@ _config_service = ConfigService(
     audit_service=_audit_service,
     notification_service=_notification_service
 )
+_bmc_service = BMCService(audit_service=_audit_service)
 
 
 # Dependency to get services
@@ -52,6 +55,10 @@ async def get_auto_resolution_service() -> AutoResolutionService:
         audit_service=_audit_service,
         notification_service=_notification_service
     )
+
+
+async def get_bmc_service() -> BMCService:
+    return _bmc_service
 
 
 # Health check endpoint
@@ -285,6 +292,92 @@ async def get_incident_audit_trail(
     including resolution attempts, notifications, and configuration changes.
     """
     return await service.get_incident_audit_trail(incident_id)
+
+
+# Exception handlers
+# BMC Integration Endpoints
+@app.post(
+    "/api/v1/bmc/records",
+    response_model=BMCRecordResponse,
+    tags=["BMC"],
+    status_code=status.HTTP_201_CREATED
+)
+async def create_bmc_record(
+    request: BMCRecordRequest,
+    actor: str = "api-user",
+    service: BMCService = Depends(get_bmc_service)
+):
+    """
+    Create a new BMC record.
+    
+    This endpoint allows integration with BMC systems to create
+    records that can be tracked and processed by the auto-resolution system.
+    """
+    return await service.create_record(request, actor=actor)
+
+
+@app.get(
+    "/api/v1/bmc/records/{record_id}",
+    response_model=BMCRecord,
+    tags=["BMC"]
+)
+async def get_bmc_record(
+    record_id: str,
+    service: BMCService = Depends(get_bmc_service)
+):
+    """Get a specific BMC record by ID."""
+    record = await service.get_record(record_id)
+    
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"BMC record {record_id} not found"
+        )
+    
+    return record
+
+
+@app.get(
+    "/api/v1/bmc/records",
+    response_model=List[BMCRecord],
+    tags=["BMC"]
+)
+async def list_bmc_records(
+    status_filter: Optional[str] = None,
+    limit: int = 100,
+    service: BMCService = Depends(get_bmc_service)
+):
+    """
+    List BMC records with optional filtering.
+    
+    Supports filtering by status and pagination.
+    """
+    status_enum = None
+    if status_filter:
+        try:
+            status_enum = BMCRecordStatus(status_filter)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status: {status_filter}"
+            )
+    
+    return await service.list_records(status=status_enum, limit=limit)
+
+
+@app.patch(
+    "/api/v1/bmc/records/{record_id}/status",
+    response_model=BMCRecordResponse,
+    tags=["BMC"]
+)
+async def update_bmc_record_status(
+    record_id: str,
+    new_status: BMCRecordStatus,
+    actor: str = "api-user",
+    service: BMCService = Depends(get_bmc_service)
+):
+    """Update the status of a BMC record."""
+    return await service.update_record_status(record_id, new_status, actor=actor)
 
 
 # Exception handlers
