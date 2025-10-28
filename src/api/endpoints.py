@@ -15,12 +15,17 @@ from src.models.recommendation import (
     FeedbackRequest, RecommendationFeedback
 )
 from src.models.report import ReportRequest, ReportResponse
+from src.models.android_issue import (
+    AndroidIssue, AndroidIssueCreateRequest, AndroidIssueUpdateRequest,
+    AndroidIssueResponse, AndroidSeverity, AndroidIssueType
+)
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.config_service import ConfigService
 from src.services.recommendation_service import RecommendationService
 from src.services.reporting_service import ReportingService
+from src.services.android_issue_service import AndroidIssueService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -39,6 +44,7 @@ _config_service = ConfigService(
 )
 _recommendation_service = RecommendationService(audit_service=_audit_service)
 _reporting_service = ReportingService(audit_service=_audit_service)
+_android_issue_service = AndroidIssueService(audit_service=_audit_service)
 
 
 # Dependency to get services
@@ -69,6 +75,10 @@ async def get_recommendation_service() -> RecommendationService:
 
 async def get_reporting_service() -> ReportingService:
     return _reporting_service
+
+
+async def get_android_issue_service() -> AndroidIssueService:
+    return _android_issue_service
 
 
 # Health check endpoint
@@ -457,6 +467,116 @@ async def get_quick_stats(
     - Kill switch state
     """
     return await service.get_quick_stats()
+
+
+# Android Issue Endpoints
+@app.post(
+    "/api/v1/android/issues",
+    response_model=AndroidIssueResponse,
+    tags=["Android Issues"],
+    status_code=status.HTTP_201_CREATED
+)
+async def create_android_issue(
+    request: AndroidIssueCreateRequest,
+    service: AndroidIssueService = Depends(get_android_issue_service)
+):
+    """
+    Create a new Android-specific issue.
+    
+    Tracks Android crashes, ANRs, performance issues, and other mobile-specific problems.
+    """
+    return await service.create_issue(request)
+
+
+@app.get(
+    "/api/v1/android/issues/{issue_id}",
+    response_model=AndroidIssue,
+    tags=["Android Issues"]
+)
+async def get_android_issue(
+    issue_id: str,
+    service: AndroidIssueService = Depends(get_android_issue_service)
+):
+    """Get details of a specific Android issue."""
+    issue = await service.get_issue(issue_id)
+    
+    if not issue:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Android issue {issue_id} not found"
+        )
+    
+    return issue
+
+
+@app.get(
+    "/api/v1/android/issues",
+    response_model=List[AndroidIssue],
+    tags=["Android Issues"]
+)
+async def list_android_issues(
+    issue_type: Optional[AndroidIssueType] = None,
+    severity: Optional[AndroidSeverity] = None,
+    is_resolved: Optional[bool] = None,
+    limit: int = 100,
+    offset: int = 0,
+    service: AndroidIssueService = Depends(get_android_issue_service)
+):
+    """
+    List Android issues with optional filters.
+    
+    Supports filtering by:
+    - Issue type (crash, ANR, performance, etc.)
+    - Severity level
+    - Resolution status
+    
+    Returns paginated results.
+    """
+    return await service.list_issues(
+        issue_type=issue_type,
+        severity=severity,
+        is_resolved=is_resolved,
+        limit=limit,
+        offset=offset
+    )
+
+
+@app.put(
+    "/api/v1/android/issues/{issue_id}",
+    response_model=AndroidIssueResponse,
+    tags=["Android Issues"]
+)
+async def update_android_issue(
+    issue_id: str,
+    request: AndroidIssueUpdateRequest,
+    service: AndroidIssueService = Depends(get_android_issue_service)
+):
+    """
+    Update an existing Android issue.
+    
+    Can modify issue details, severity, resolution status, and tags.
+    """
+    return await service.update_issue(issue_id, request)
+
+
+@app.get(
+    "/api/v1/android/statistics",
+    response_model=dict,
+    tags=["Android Issues"]
+)
+async def get_android_statistics(
+    service: AndroidIssueService = Depends(get_android_issue_service)
+):
+    """
+    Get aggregated statistics about Android issues.
+    
+    Returns:
+    - Total issue counts
+    - Breakdown by type and severity
+    - Open vs resolved issues
+    - Total occurrences across all issues
+    """
+    return await service.get_statistics()
 
 
 # Exception handlers
