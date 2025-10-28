@@ -14,11 +14,16 @@ from src.models.recommendation import (
     ResolutionRecommendation, RecommendationRequest, RecommendationResponse,
     FeedbackRequest, RecommendationFeedback
 )
+from src.models.classification import (
+    ClassificationRequest, ClassificationResult, ClassificationOverride,
+    ClassificationStats, ClassificationFeedback
+)
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.config_service import ConfigService
 from src.services.recommendation_service import RecommendationService
+from src.services.classification_service import ClassificationService
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -36,6 +41,7 @@ _config_service = ConfigService(
     notification_service=_notification_service
 )
 _recommendation_service = RecommendationService(audit_service=_audit_service)
+_classification_service = ClassificationService(audit_service=_audit_service)
 
 
 # Dependency to get services
@@ -62,6 +68,10 @@ async def get_auto_resolution_service() -> AutoResolutionService:
 
 async def get_recommendation_service() -> RecommendationService:
     return _recommendation_service
+
+
+async def get_classification_service() -> ClassificationService:
+    return _classification_service
 
 
 # Health check endpoint
@@ -403,6 +413,181 @@ async def get_incident_feedback(
     """
     feedback_list = await service.get_feedback_for_incident(incident_id)
     return feedback_list
+
+
+# Classification Endpoints
+@app.post(
+    "/api/v1/incidents/classify",
+    response_model=ClassificationResult,
+    tags=["Classification"],
+    status_code=status.HTTP_200_OK
+)
+async def classify_incident(
+    request: ClassificationRequest,
+    service: ClassificationService = Depends(get_classification_service)
+):
+    """
+    Classify an incident into a predefined category.
+    
+    Requirements:
+    - Correctly classify at least 80% of incoming incidents
+    - Classification within 5 seconds of ticket creation
+    - Display confidence score alongside category
+    - Support for 20+ predefined incident categories
+    
+    Returns classification result with category, confidence score, and alternatives.
+    """
+    result = await service.classify_incident(request)
+    return result
+
+
+@app.post(
+    "/api/v1/incidents/{incident_id}/classify-override",
+    response_model=ClassificationOverride,
+    tags=["Classification"],
+    status_code=status.HTTP_200_OK
+)
+async def override_classification(
+    incident_id: str,
+    original_category: str,
+    original_confidence: float,
+    override_category: str,
+    override_reason: str,
+    overridden_by: str,
+    service: ClassificationService = Depends(get_classification_service)
+):
+    """
+    Manually override automatic incident classification.
+    
+    This endpoint supports the manual override requirement, allowing
+    support staff to correct misclassifications and improve the model.
+    
+    Args:
+        incident_id: Incident identifier
+        original_category: Original automatic classification
+        original_confidence: Original confidence score
+        override_category: Manual override category
+        override_reason: Reason for override
+        overridden_by: User performing the override
+    """
+    from src.models.incident import IncidentCategory
+    
+    try:
+        original_cat = IncidentCategory(original_category)
+        override_cat = IncidentCategory(override_category)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid category: {str(e)}"
+        )
+    
+    result = await service.override_classification(
+        incident_id=incident_id,
+        original_category=original_cat,
+        original_confidence=original_confidence,
+        override_category=override_cat,
+        override_reason=override_reason,
+        overridden_by=overridden_by
+    )
+    
+    return result
+
+
+@app.get(
+    "/api/v1/classification/stats",
+    response_model=ClassificationStats,
+    tags=["Classification"]
+)
+async def get_classification_stats(
+    service: ClassificationService = Depends(get_classification_service)
+):
+    """
+    Get classification engine performance statistics.
+    
+    Returns metrics including:
+    - Total classifications performed
+    - Accuracy rate (target: 80%)
+    - Average confidence score
+    - Average processing time (target: < 5 seconds)
+    - Override rate
+    - Category distribution
+    """
+    stats = await service.get_stats()
+    return stats
+
+
+@app.get(
+    "/api/v1/incidents/{incident_id}/classification-overrides",
+    response_model=List[ClassificationOverride],
+    tags=["Classification"]
+)
+async def get_classification_overrides(
+    incident_id: str,
+    service: ClassificationService = Depends(get_classification_service)
+):
+    """
+    Get all classification overrides for a specific incident.
+    
+    Useful for tracking manual corrections and classification history.
+    """
+    overrides = await service.get_overrides(incident_id=incident_id)
+    return overrides
+
+
+@app.post(
+    "/api/v1/classification/feedback",
+    response_model=ClassificationFeedback,
+    tags=["Classification"],
+    status_code=status.HTTP_201_CREATED
+)
+async def submit_classification_feedback(
+    incident_id: str,
+    classification_id: str,
+    was_correct: bool,
+    expected_category: Optional[str] = None,
+    feedback_type: str = "correct",
+    comments: Optional[str] = None,
+    submitted_by: str = "user",
+    service: ClassificationService = Depends(get_classification_service)
+):
+    """
+    Submit feedback on classification accuracy.
+    
+    This feedback is used to monitor and improve the classification engine's
+    accuracy over time, helping to meet the 80% accuracy requirement.
+    
+    Args:
+        incident_id: Incident identifier
+        classification_id: Classification result identifier
+        was_correct: Whether the classification was correct
+        expected_category: What the category should have been (if incorrect)
+        feedback_type: Type of feedback (correct, incorrect, partially_correct)
+        comments: Additional comments
+        submitted_by: User submitting feedback
+    """
+    from src.models.incident import IncidentCategory
+    
+    expected_cat = None
+    if expected_category:
+        try:
+            expected_cat = IncidentCategory(expected_category)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid expected category: {expected_category}"
+            )
+    
+    feedback = await service.submit_feedback(
+        incident_id=incident_id,
+        classification_id=classification_id,
+        was_correct=was_correct,
+        expected_category=expected_cat,
+        feedback_type=feedback_type,
+        comments=comments,
+        submitted_by=submitted_by
+    )
+    
+    return feedback
 
 
 # Exception handlers

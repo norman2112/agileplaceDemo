@@ -17,13 +17,41 @@ class IncidentStatus(str, Enum):
 
 
 class IncidentCategory(str, Enum):
-    """Incident category types."""
+    """Incident category types - expanded for classification engine."""
+    # Infrastructure & Network
     NETWORK = "network"
-    DATABASE = "database"
-    APPLICATION = "application"
-    SECURITY = "security"
+    NETWORK_CONNECTIVITY = "network_connectivity"
+    NETWORK_LATENCY = "network_latency"
+    NETWORK_DNS = "network_dns"
     INFRASTRUCTURE = "infrastructure"
+    HARDWARE_FAILURE = "hardware_failure"
+    POWER_OUTAGE = "power_outage"
+    STORAGE = "storage"
+    
+    # Application & Software
+    APPLICATION = "application"
+    APPLICATION_CRASH = "application_crash"
+    APPLICATION_PERFORMANCE = "application_performance"
+    SOFTWARE_BUG = "software_bug"
+    DEPLOYMENT_ISSUE = "deployment_issue"
+    
+    # Database
+    DATABASE = "database"
+    DATABASE_CONNECTIVITY = "database_connectivity"
+    DATABASE_PERFORMANCE = "database_performance"
+    DATABASE_CORRUPTION = "database_corruption"
+    
+    # Security
+    SECURITY = "security"
+    SECURITY_BREACH = "security_breach"
+    MALWARE = "malware"
+    UNAUTHORIZED_ACCESS = "unauthorized_access"
+    
+    # User & Access
     USER_ACCESS = "user_access"
+    AUTHENTICATION = "authentication"
+    AUTHORIZATION = "authorization"
+    PASSWORD_RESET = "password_reset"
 
 
 class IncidentPriority(str, Enum):
