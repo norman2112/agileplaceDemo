@@ -2,12 +2,15 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from src.services.user_service import update_user_profile
 from src.services.insights_service import InsightsService
+from src.services.daily_summary_service import DailySummaryService
 from src.models.user import UserProfile
 from src.models.insight import (
     InsightsRequest, InsightsResponse, InsightFeedback,
     AnomalyThresholdConfig, ServiceArea
 )
+from src.models.daily_summary import DailySummaryConfig, DailySummaryReport
 from typing import Optional, List
+from datetime import datetime
 from pydantic import BaseModel
 
 app = FastAPI(
@@ -17,6 +20,7 @@ app = FastAPI(
 )
 
 insights_service = InsightsService()
+daily_summary_service = DailySummaryService()
 
 class UserLogin(BaseModel):
     email: str
@@ -51,3 +55,25 @@ async def configure_anomaly_threshold(config: AnomalyThresholdConfig):
 @app.get("/api/v1/insights/thresholds", response_model=List[AnomalyThresholdConfig], tags=["Insights"])
 async def get_anomaly_thresholds(service_area: Optional[ServiceArea] = None):
     return await insights_service.get_thresholds(service_area)
+
+@app.post("/api/v1/daily-summary/configure", response_model=DailySummaryConfig, tags=["Daily Summary"])
+async def configure_daily_summary(config: DailySummaryConfig):
+    return await daily_summary_service.configure_summary(config)
+
+@app.get("/api/v1/daily-summary/config/{user_id}", response_model=DailySummaryConfig, tags=["Daily Summary"])
+async def get_daily_summary_config(user_id: str):
+    config = await daily_summary_service.get_config(user_id)
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuration not found")
+    return config
+
+@app.post("/api/v1/daily-summary/generate/{user_id}", response_model=DailySummaryReport, tags=["Daily Summary"])
+async def generate_daily_summary(
+    user_id: str,
+    period_start: Optional[datetime] = None,
+    period_end: Optional[datetime] = None
+):
+    try:
+        return await daily_summary_service.generate_daily_summary(user_id, period_start, period_end)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
