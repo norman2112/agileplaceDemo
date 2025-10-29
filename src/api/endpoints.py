@@ -2,12 +2,17 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from src.services.user_service import update_user_profile
 from src.services.insights_service import InsightsService
+from src.services.widget_service import WidgetService
 from src.models.user import UserProfile
 from src.models.insight import (
     InsightsRequest, InsightsResponse, InsightFeedback,
     AnomalyThresholdConfig, ServiceArea
 )
-from typing import Optional, List
+from src.models.widget import (
+    Widget, WidgetCreateRequest, WidgetTemplate, WidgetStatus,
+    WidgetApprovalRequest, WidgetValidationResult
+)
+from typing import Optional, List, Dict
 from pydantic import BaseModel
 
 app = FastAPI(
@@ -17,6 +22,7 @@ app = FastAPI(
 )
 
 insights_service = InsightsService()
+widget_service = WidgetService()
 
 class UserLogin(BaseModel):
     email: str
@@ -51,3 +57,51 @@ async def configure_anomaly_threshold(config: AnomalyThresholdConfig):
 @app.get("/api/v1/insights/thresholds", response_model=List[AnomalyThresholdConfig], tags=["Insights"])
 async def get_anomaly_thresholds(service_area: Optional[ServiceArea] = None):
     return await insights_service.get_thresholds(service_area)
+
+@app.post("/api/v1/widgets", response_model=Widget, tags=["Widgets"])
+async def create_widget(creator_id: str, request: WidgetCreateRequest):
+    return await widget_service.create_widget(creator_id, request)
+
+@app.get("/api/v1/widgets/templates", response_model=List[WidgetTemplate], tags=["Widgets"])
+async def get_widget_templates():
+    return await widget_service.get_templates()
+
+@app.get("/api/v1/widgets/{widget_id}", response_model=Widget, tags=["Widgets"])
+async def get_widget(widget_id: str):
+    widget = await widget_service.get_widget(widget_id)
+    if not widget:
+        raise HTTPException(status_code=404, detail="Widget not found")
+    return widget
+
+@app.get("/api/v1/widgets/creator/{creator_id}", response_model=List[Widget], tags=["Widgets"])
+async def get_widgets_by_creator(creator_id: str):
+    return await widget_service.get_widgets_by_creator(creator_id)
+
+@app.get("/api/v1/widgets/status/{status}", response_model=List[Widget], tags=["Widgets"])
+async def get_widgets_by_status(status: WidgetStatus):
+    return await widget_service.get_widgets_by_status(status)
+
+@app.post("/api/v1/widgets/{widget_id}/validate", response_model=WidgetValidationResult, tags=["Widgets"])
+async def validate_widget(widget_id: str):
+    return await widget_service.validate_widget(widget_id)
+
+@app.post("/api/v1/widgets/{widget_id}/submit", response_model=Widget, tags=["Widgets"])
+async def submit_widget_for_approval(widget_id: str):
+    try:
+        return await widget_service.submit_for_approval(widget_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/widgets/approve", response_model=Widget, tags=["Widgets"])
+async def approve_widget(request: WidgetApprovalRequest):
+    try:
+        return await widget_service.approve_widget(request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.put("/api/v1/widgets/{widget_id}/position", response_model=Widget, tags=["Widgets"])
+async def update_widget_position(widget_id: str, position: Dict[str, int]):
+    try:
+        return await widget_service.update_widget_position(widget_id, position)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
