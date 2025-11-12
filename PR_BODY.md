@@ -1,50 +1,21 @@
 ## Summary
 
-Created headless Business Logic Agent for programmatic BL integration without web interface dependencies.
+Implemented encryption and decryption mechanisms for Personally Identifiable Information (PII) fields to ensure data security and compliance with privacy regulations.
 
 ## Changes
 
-- **Added** `src/bl_agent.py`: Non-UI agent providing programmatic access to core business logic services
-  - Wraps auto-resolution, insights, recommendations, and reporting services
-  - Enables direct Python API usage without FastAPI/web server
-  - Factory function `create_agent()` for easy instantiation
-  - Configurable audit and notification support
-
-## Key Features
-
-- **Incident Resolution**: Direct programmatic incident resolution and status checking
-- **Insights Generation**: Generate analytics and insights without web endpoints
-- **Recommendations**: Get resolution recommendations programmatically
-- **Reporting**: Generate operational reports via code
-- **Configuration Management**: Control thresholds, categories, and kill switch
-- **Audit Trail**: Optional audit logging for all operations
-
-## Usage Example
-
-```python
-from src.bl_agent import create_agent
-from src.models.incident import Incident, IncidentCategory, IncidentPriority
-
-# Create agent instance
-agent = create_agent()
-
-# Resolve an incident
-incident = Incident(
-    incident_id="INC-001",
-    title="Service Down",
-    description="API not responding",
-    category=IncidentCategory.APPLICATION,
-    priority=IncidentPriority.HIGH,
-    confidence_score=0.95,
-    created_by="user_123"
-)
-
-response = await agent.resolve_incident(incident)
-```
+- Added `cryptography` library to project dependencies
+- Created `EncryptionService` utility for encrypting and decrypting PII data using Fernet symmetric encryption
+- Updated `UserProfile` model to automatically encrypt PII fields (name, email, phone_number, address) on input and decrypt on serialization
+- Encryption key managed via environment variable `ENCRYPTION_KEY` with automatic generation fallback
 
 ## Technical Details
 
-- No FastAPI or uvicorn dependencies required
-- Async/await support maintained
-- All existing service integrations preserved
-- Backward compatible with existing codebase
+- Uses Fernet symmetric encryption from the `cryptography` library
+- PII fields are encrypted when data enters the system and decrypted when accessed
+- Graceful handling of null/empty values
+- Environment-based key management for security
+
+## Testing Notes
+
+Ensure `ENCRYPTION_KEY` environment variable is set in production environments for consistent encryption/decryption across deployments.
