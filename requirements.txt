@@ -3,6 +3,7 @@ fastapi==0.104.1
 pydantic==2.5.0
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
+cryptography==41.0.7
 
 # Async support
 aiofiles==23.2.1
