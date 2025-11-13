@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from src.services.user_service import update_user_profile
 from src.services.insights_service import InsightsService
 from src.services.widget_service import WidgetService
+from src.services.fine_tuning_service import FineTuningService
 from src.models.user import UserProfile
 from src.models.insight import (
     InsightsRequest, InsightsResponse, InsightFeedback,
@@ -11,6 +12,10 @@ from src.models.insight import (
 from src.models.widget import (
     Widget, WidgetCreateRequest, WidgetTemplate, WidgetStatus,
     WidgetApprovalRequest, WidgetValidationResult
+)
+from src.models.fine_tuning import (
+    FineTuningJob, FineTuningRequest, FineTuningMetrics,
+    FineTuningStatus
 )
 from typing import Optional, List, Dict
 from pydantic import BaseModel
@@ -23,6 +28,7 @@ app = FastAPI(
 
 insights_service = InsightsService()
 widget_service = WidgetService()
+fine_tuning_service = FineTuningService()
 
 class UserLogin(BaseModel):
     email: str
@@ -105,3 +111,46 @@ async def update_widget_position(widget_id: str, position: Dict[str, int]):
         return await widget_service.update_widget_position(widget_id, position)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@app.post("/api/v1/fine-tuning/jobs", response_model=FineTuningJob, tags=["Fine-Tuning"])
+async def create_fine_tuning_job(user_id: str, request: FineTuningRequest):
+    return await fine_tuning_service.create_job(request, user_id)
+
+@app.get("/api/v1/fine-tuning/jobs/{job_id}", response_model=FineTuningJob, tags=["Fine-Tuning"])
+async def get_fine_tuning_job(job_id: str):
+    job = await fine_tuning_service.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+@app.get("/api/v1/fine-tuning/jobs", response_model=List[FineTuningJob], tags=["Fine-Tuning"])
+async def list_fine_tuning_jobs(
+    user_id: Optional[str] = None,
+    status: Optional[FineTuningStatus] = None
+):
+    return await fine_tuning_service.list_jobs(user_id, status)
+
+@app.post("/api/v1/fine-tuning/jobs/{job_id}/start", response_model=FineTuningJob, tags=["Fine-Tuning"])
+async def start_fine_tuning_job(job_id: str):
+    try:
+        return await fine_tuning_service.start_job(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/v1/fine-tuning/jobs/{job_id}/metrics", response_model=FineTuningJob, tags=["Fine-Tuning"])
+async def update_fine_tuning_metrics(job_id: str, metrics: FineTuningMetrics):
+    try:
+        return await fine_tuning_service.update_job_metrics(job_id, metrics)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+@app.get("/api/v1/fine-tuning/jobs/{job_id}/metrics", response_model=List[FineTuningMetrics], tags=["Fine-Tuning"])
+async def get_fine_tuning_metrics(job_id: str):
+    return await fine_tuning_service.get_job_metrics(job_id)
+
+@app.post("/api/v1/fine-tuning/jobs/{job_id}/cancel", response_model=FineTuningJob, tags=["Fine-Tuning"])
+async def cancel_fine_tuning_job(job_id: str):
+    try:
+        return await fine_tuning_service.cancel_job(job_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
