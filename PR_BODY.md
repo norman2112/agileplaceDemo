@@ -1,50 +1,36 @@
 ## Summary
 
-Created headless Business Logic Agent for programmatic BL integration without web interface dependencies.
+Implemented infrastructure and tooling to support fine-tuning of Small Language Models (SLMs). This change enables model customization for specific use cases through a comprehensive API and service layer.
 
 ## Changes
 
-- **Added** `src/bl_agent.py`: Non-UI agent providing programmatic access to core business logic services
-  - Wraps auto-resolution, insights, recommendations, and reporting services
-  - Enables direct Python API usage without FastAPI/web server
-  - Factory function `create_agent()` for easy instantiation
-  - Configurable audit and notification support
+- **New Model**: `src/models/fine_tuning.py`
+  - `FineTuningJob`: Tracks fine-tuning job lifecycle
+  - `FineTuningConfig`: Configurable hyperparameters for training
+  - `FineTuningStatus`: Job state management (pending, running, completed, failed, cancelled)
+  - `ModelType`: Support for GPT-2, DistilGPT-2, BLOOM-560M, OPT-125M, Pythia-160M
+  - `FineTuningMetrics`: Training metrics tracking
 
-## Key Features
+- **New Service**: `src/services/fine_tuning_service.py`
+  - Job creation and lifecycle management
+  - Training metrics collection
+  - Job status transitions and validation
+  - Support for concurrent fine-tuning jobs
 
-- **Incident Resolution**: Direct programmatic incident resolution and status checking
-- **Insights Generation**: Generate analytics and insights without web endpoints
-- **Recommendations**: Get resolution recommendations programmatically
-- **Reporting**: Generate operational reports via code
-- **Configuration Management**: Control thresholds, categories, and kill switch
-- **Audit Trail**: Optional audit logging for all operations
+- **API Endpoints**: `src/api/endpoints.py`
+  - `POST /api/v1/fine-tuning/jobs` - Create fine-tuning job
+  - `GET /api/v1/fine-tuning/jobs/{job_id}` - Get job details
+  - `GET /api/v1/fine-tuning/jobs` - List jobs with filters
+  - `POST /api/v1/fine-tuning/jobs/{job_id}/start` - Start job
+  - `POST /api/v1/fine-tuning/jobs/{job_id}/metrics` - Update metrics
+  - `GET /api/v1/fine-tuning/jobs/{job_id}/metrics` - Get job metrics
+  - `POST /api/v1/fine-tuning/jobs/{job_id}/cancel` - Cancel job
 
-## Usage Example
+## Implementation Details
 
-```python
-from src.bl_agent import create_agent
-from src.models.incident import Incident, IncidentCategory, IncidentPriority
-
-# Create agent instance
-agent = create_agent()
-
-# Resolve an incident
-incident = Incident(
-    incident_id="INC-001",
-    title="Service Down",
-    description="API not responding",
-    category=IncidentCategory.APPLICATION,
-    priority=IncidentPriority.HIGH,
-    confidence_score=0.95,
-    created_by="user_123"
-)
-
-response = await agent.resolve_incident(incident)
-```
-
-## Technical Details
-
-- No FastAPI or uvicorn dependencies required
-- Async/await support maintained
-- All existing service integrations preserved
-- Backward compatible with existing codebase
+- Follows existing codebase patterns and conventions
+- Async/await throughout for non-blocking operations
+- Pydantic models for request/response validation
+- Comprehensive error handling and logging
+- In-memory storage (ready for database integration)
+- Configurable hyperparameters with sensible defaults
