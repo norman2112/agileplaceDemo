@@ -8,6 +8,8 @@ from src.models.insight import (
     InsightsRequest, InsightsResponse, InsightFeedback,
     AnomalyThresholdConfig, ServiceArea
 )
+from src.models.report import ReportChatRequest, ReportChatResponse
+from src.bl_agent import BusinessLogicAgent
 from src.models.widget import (
     Widget, WidgetCreateRequest, WidgetTemplate, WidgetStatus,
     WidgetApprovalRequest, WidgetValidationResult
@@ -23,6 +25,7 @@ app = FastAPI(
 
 insights_service = InsightsService()
 widget_service = WidgetService()
+insightbot_agent = BusinessLogicAgent()
 
 class UserLogin(BaseModel):
     email: str
@@ -91,6 +94,17 @@ async def submit_widget_for_approval(widget_id: str):
         return await widget_service.submit_for_approval(widget_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post(
+    "/api/v1/insightbot/chat/report",
+    response_model=ReportChatResponse,
+    tags=["Insights"]
+)
+async def request_report_via_chat(request: ReportChatRequest):
+    try:
+        return await insightbot_agent.handle_chat_report_request(request)
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
 @app.post("/api/v1/widgets/approve", response_model=Widget, tags=["Widgets"])
 async def approve_widget(request: WidgetApprovalRequest):

@@ -15,7 +15,14 @@ from src.models.insight import (
     InsightsRequest, InsightsResponse, ServiceArea,
     InsightFeedback, AnomalyThresholdConfig
 )
-from src.models.report import ReportRequest, ReportResponse
+from src.models.report import (
+    ReportRequest,
+    ReportResponse,
+    ReportType,
+    TimeRange,
+    ReportChatRequest,
+    ReportChatResponse
+)
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.insights_service import InsightsService
 from src.services.audit_service import AuditService
@@ -214,6 +221,51 @@ class BusinessLogicAgent:
             return None
         return await self.reporting.generate_report(request)
     
+    async def handle_chat_report_request(
+        self,
+        chat_request: ReportChatRequest
+    ) -> ReportChatResponse:
+        """
+        Generate reports in response to InsightBot chat prompts.
+        
+        Args:
+            chat_request: Normalized chat payload with optional overrides
+        
+        Returns:
+            Structured chat response with shareable assets
+        """
+        if not self.reporting:
+            raise ValueError("Reporting service not available (audit disabled)")
+        
+        report_type = chat_request.report_type or self._infer_report_type(chat_request.message)
+        time_range = chat_request.time_range or self._infer_time_range(chat_request.message)
+        
+        report_request = ReportRequest(
+            report_type=report_type,
+            time_range=time_range,
+            start_date=chat_request.start_date,
+            end_date=chat_request.end_date,
+            comparison_period_days=chat_request.comparison_period_days,
+            category_filter=chat_request.metadata.get("category"),
+            priority_filter=chat_request.metadata.get("priority")
+        )
+        
+        report = await self.reporting.generate_report(report_request)
+        if not report:
+            raise ValueError("Unable to generate report for chat request")
+        
+        reply = (
+            f"Generated {report.report_type.value.replace('_', ' ')} covering {report.time_range.value.replace('_', ' ')}. "
+            f"Share this link with stakeholders: {report.shareable_link}."
+        )
+        
+        return ReportChatResponse(
+            reply=reply,
+            report=report,
+            shareable_link=report.shareable_link or "",
+            export_payload=report.export_payload or {}
+        )
+    
     async def bulk_resolve_incidents(
         self,
         incidents: List[Incident]
@@ -285,6 +337,28 @@ class BusinessLogicAgent:
         else:
             self.config.category_configs[category].confidence_threshold = threshold
         logger.info(f"Confidence threshold for {category.value}: {threshold:.2%}")
+    
+    def _infer_report_type(self, message: str) -> ReportType:
+        """Map chat utterances to supported report types."""
+        normalized = message.lower()
+        if "trend" in normalized or "compare" in normalized:
+            return ReportType.INCIDENT_TRENDS
+        if "performance" in normalized or "latency" in normalized:
+            return ReportType.PERFORMANCE_METRICS
+        if "recommendation" in normalized or "adoption" in normalized:
+            return ReportType.RECOMMENDATION_EFFECTIVENESS
+        return ReportType.RESOLUTION_SUMMARY
+    
+    def _infer_time_range(self, message: str) -> TimeRange:
+        """Infer a time window based on common chat phrases."""
+        normalized = message.lower()
+        if "24" in normalized or "day" in normalized:
+            return TimeRange.LAST_24_HOURS
+        if "30" in normalized or "month" in normalized:
+            return TimeRange.LAST_30_DAYS
+        if "90" in normalized or "quarter" in normalized:
+            return TimeRange.LAST_90_DAYS
+        return TimeRange.LAST_7_DAYS
     
     async def get_audit_log(
         self,
