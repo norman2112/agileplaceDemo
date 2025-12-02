@@ -16,12 +16,18 @@ from src.models.insight import (
     InsightFeedback, AnomalyThresholdConfig
 )
 from src.models.report import ReportRequest, ReportResponse
+from src.models.request import (
+    WorkRequest,
+    NotificationPreference,
+    NotificationFeedback
+)
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.insights_service import InsightsService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.recommendation_service import RecommendationService
 from src.services.reporting_service import ReportingService
+from src.services.insight_bot_service import InsightBotService
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +54,9 @@ class BusinessLogicAgent:
             notification_service=self.notification_service
         )
         self.insights = InsightsService()
+        self.insight_bot = InsightBotService(
+            notification_service=self.notification_service
+        )
         self.recommendations = RecommendationService(self.audit_service) if self.audit_service else None
         self.reporting = ReportingService(self.audit_service) if self.audit_service else None
         
@@ -232,6 +241,34 @@ class BusinessLogicAgent:
             response = await self.resolve_incident(incident)
             responses.append(response)
         return responses
+
+    async def notify_relevant_request(
+        self,
+        request: WorkRequest,
+        candidate_user_ids: List[str]
+    ) -> List[Dict[str, str]]:
+        """
+        Generate InsightBot notifications for a request update.
+        """
+        return await self.insight_bot.process_request_update(request, candidate_user_ids)
+
+    async def register_notification_preferences(
+        self,
+        preference: NotificationPreference
+    ) -> NotificationPreference:
+        """
+        Store or update InsightBot notification preferences for a user.
+        """
+        return await self.insight_bot.register_preferences(preference)
+
+    async def record_notification_feedback(
+        self,
+        feedback: NotificationFeedback
+    ) -> NotificationFeedback:
+        """
+        Capture user feedback to improve InsightBot relevance.
+        """
+        return await self.insight_bot.record_feedback(feedback)
     
     def set_global_enabled(self, enabled: bool):
         """
