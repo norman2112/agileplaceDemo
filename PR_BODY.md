@@ -1,50 +1,46 @@
 ## Summary
 
-Created headless Business Logic Agent for programmatic BL integration without web interface dependencies.
+Introduced InsightBot notification pipeline so team members can receive intelligent request alerts tailored to their work.
 
 ## Changes
 
-- **Added** `src/bl_agent.py`: Non-UI agent providing programmatic access to core business logic services
-  - Wraps auto-resolution, insights, recommendations, and reporting services
-  - Enables direct Python API usage without FastAPI/web server
-  - Factory function `create_agent()` for easy instantiation
-  - Configurable audit and notification support
+- Created InsightBot data models covering request payloads, team context, notification preferences, and feedback wiring
+- Added InsightBot service with relevance scoring, preference controls, learning loop, and notification budgeting
+- Extended FastAPI endpoints with InsightBot notification, preference, and feedback routes
 
 ## Key Features
 
-- **Incident Resolution**: Direct programmatic incident resolution and status checking
-- **Insights Generation**: Generate analytics and insights without web endpoints
-- **Recommendations**: Get resolution recommendations programmatically
-- **Reporting**: Generate operational reports via code
-- **Configuration Management**: Control thresholds, categories, and kill switch
-- **Audit Trail**: Optional audit logging for all operations
+- Content + tag analysis to match requests with relevant teammates
+- Notifications always include request summary, priority, channel, and rationale
+- User-configurable thresholds, delivery channels, and tag/keyword preferences
+- Lightweight learning loop that boosts or suppresses future alerts based on explicit feedback
 
 ## Usage Example
 
 ```python
-from src.bl_agent import create_agent
-from src.models.incident import Incident, IncidentCategory, IncidentPriority
-
-# Create agent instance
-agent = create_agent()
-
-# Resolve an incident
-incident = Incident(
-    incident_id="INC-001",
-    title="Service Down",
-    description="API not responding",
-    category=IncidentCategory.APPLICATION,
-    priority=IncidentPriority.HIGH,
-    confidence_score=0.95,
-    created_by="user_123"
+from src.models.insightbot import (
+    InsightBotNotificationRequest,
+    RequestPayload,
+    TeamMemberContext,
+    RequestPriority,
 )
+from src.services.insight_bot_service import InsightBotService
 
-response = await agent.resolve_incident(incident)
+service = InsightBotService()
+request = RequestPayload(
+    request_id="REQ-42",
+    summary="Database latency spike",
+    details="Checkout API slowed after schema change",
+    priority=RequestPriority.HIGH,
+    tags=["database", "performance"],
+)
+team = [TeamMemberContext(user_id="alice", roles=["dba"], focus_tags=["database"])]
+notifications = await service.evaluate_notifications(request, team)
 ```
 
 ## Technical Details
 
-- No FastAPI or uvicorn dependencies required
-- Async/await support maintained
-- All existing service integrations preserved
-- Backward compatible with existing codebase
+- Relevance scoring blends tag overlap, keyword matches, user focus, and priority weighting
+- Per-user preferences stored in-memory with merge-on-update semantics
+- Feedback adjusts personal bias within ±0.25 to refine alert thresholds without retraining models
+- Daily notification budgets guard against noisy floods while still honoring high-priority work

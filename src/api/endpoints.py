@@ -3,10 +3,19 @@ from fastapi.responses import JSONResponse
 from src.services.user_service import update_user_profile
 from src.services.insights_service import InsightsService
 from src.services.widget_service import WidgetService
+from src.services.insight_bot_service import InsightBotService
 from src.models.user import UserProfile
 from src.models.insight import (
     InsightsRequest, InsightsResponse, InsightFeedback,
     AnomalyThresholdConfig, ServiceArea
+)
+from src.models.insightbot import (
+    InsightBotNotificationRequest,
+    NotificationPreference,
+    NotificationPreferenceUpdate,
+    NotificationResult,
+    FeedbackPayload,
+    FeedbackResponse,
 )
 from src.models.widget import (
     Widget, WidgetCreateRequest, WidgetTemplate, WidgetStatus,
@@ -23,6 +32,7 @@ app = FastAPI(
 
 insights_service = InsightsService()
 widget_service = WidgetService()
+insight_bot_service = InsightBotService()
 
 class UserLogin(BaseModel):
     email: str
@@ -57,6 +67,22 @@ async def configure_anomaly_threshold(config: AnomalyThresholdConfig):
 @app.get("/api/v1/insights/thresholds", response_model=List[AnomalyThresholdConfig], tags=["Insights"])
 async def get_anomaly_thresholds(service_area: Optional[ServiceArea] = None):
     return await insights_service.get_thresholds(service_area)
+
+@app.post("/api/v1/insightbot/notifications", response_model=List[NotificationResult], tags=["InsightBot"])
+async def notify_relevant_requests(payload: InsightBotNotificationRequest):
+    return await insight_bot_service.evaluate_notifications(payload.request, payload.team_members)
+
+@app.get("/api/v1/insightbot/preferences/{user_id}", response_model=NotificationPreference, tags=["InsightBot"])
+async def get_notification_preferences(user_id: str):
+    return await insight_bot_service.get_preferences(user_id)
+
+@app.put("/api/v1/insightbot/preferences/{user_id}", response_model=NotificationPreference, tags=["InsightBot"])
+async def update_notification_preferences(user_id: str, update: NotificationPreferenceUpdate):
+    return await insight_bot_service.update_preferences(user_id, update)
+
+@app.post("/api/v1/insightbot/feedback", response_model=FeedbackResponse, tags=["InsightBot"])
+async def submit_insightbot_feedback(feedback: FeedbackPayload):
+    return await insight_bot_service.record_feedback(feedback)
 
 @app.post("/api/v1/widgets", response_model=Widget, tags=["Widgets"])
 async def create_widget(creator_id: str, request: WidgetCreateRequest):
