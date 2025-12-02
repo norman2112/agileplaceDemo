@@ -4,6 +4,7 @@ Report data models for analytics and reporting.
 from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional, Any
+from uuid import uuid4
 from pydantic import BaseModel, Field
 
 
@@ -73,6 +74,12 @@ class ReportRequest(BaseModel):
     end_date: Optional[datetime] = None
     category_filter: Optional[str] = None
     priority_filter: Optional[str] = None
+    comparison_period_days: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=365,
+        description="Days in comparison window for historical benchmarking"
+    )
 
 
 class ReportResponse(BaseModel):
@@ -83,7 +90,23 @@ class ReportResponse(BaseModel):
     time_range: TimeRange
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
-    
+    comparison_window_days: Optional[int] = Field(
+        default=None,
+        description="Length of comparison period applied to report"
+    )
+    comparison_summary: Optional[Dict[str, Any]] = None
+    visualizations: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Chart payloads for key metrics across systems"
+    )
+    shareable_link: Optional[str] = Field(
+        default=None,
+        description="URL for stakeholders to view the report"
+    )
+    export_payload: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Serialized data payload supporting exports"
+    )
     # Report data (varies by type)
     resolution_summary: Optional[ResolutionSummary] = None
     incident_trends: Optional[IncidentTrends] = None
@@ -96,3 +119,24 @@ class ReportResponse(BaseModel):
         json_encoders = {
             datetime: lambda v: v.isoformat()
         }
+
+
+class ReportChatRequest(BaseModel):
+    """Chat-based request for report generation."""
+    user_id: str
+    message: str
+    report_type: Optional[ReportType] = None
+    time_range: Optional[TimeRange] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    comparison_period_days: Optional[int] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ReportChatResponse(BaseModel):
+    """Chat response containing generated report artifacts."""
+    response_id: str = Field(default_factory=lambda: str(uuid4()))
+    reply: str
+    report: ReportResponse
+    shareable_link: str
+    export_payload: Dict[str, Any]
