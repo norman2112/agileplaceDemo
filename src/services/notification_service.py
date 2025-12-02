@@ -6,6 +6,7 @@ from typing import List
 from datetime import datetime
 
 from src.models.incident import Incident, ResolutionStep
+from src.models.request import WorkRequest
 from src.services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,55 @@ class NotificationService:
                 exc_info=True
             )
             return False
+
+    async def notify_request_relevance(
+        self,
+        recipient: str,
+        request: WorkRequest,
+        score: float,
+        channels: List[str]
+    ) -> bool:
+        """
+        Notify a user that InsightBot identified a relevant work request.
+        """
+        subject = f"InsightBot alert: {request.summary} ({request.priority.value.upper()})"
+        channel_list = ", ".join(channels) if channels else "email"
+        tags = ", ".join(request.tags) if request.tags else "none"
+
+        message = f"""
+InsightBot detected a request that may need your attention.
+
+Summary: {request.summary}
+Priority: {request.priority.value.title()}
+Request Type: {request.request_type.value.title()}
+Channels: {channel_list}
+Relevance Score: {score:.2f}
+Tags: {tags}
+
+Details:
+{request.description}
+""".strip()
+
+        try:
+            await self._send_generic_notification(recipient, subject, message)
+
+            if self.audit_service:
+                await self.audit_service.log_notification_sent(
+                    incident_id=request.request_id,
+                    recipient=recipient,
+                    notification_type="insightbot_request"
+                )
+
+            return True
+
+        except Exception as exc:
+            logger.error(
+                "Failed to send InsightBot notification for request %s: %s",
+                request.request_id,
+                str(exc),
+                exc_info=True
+            )
+            return False
     
     def _build_notification_message(
         self,
@@ -141,32 +191,19 @@ This is an automated message. For questions, please contact your IT Operations t
         This is a placeholder for actual notification implementation.
         In production, implement integration with your notification systems.
         """
+        await self._send_generic_notification(recipient, subject, message)
+
+    async def _send_generic_notification(
+        self,
+        recipient: str,
+        subject: str,
+        message: str
+    ):
         logger.info(f"Sending notification to {recipient}: {subject}")
-        
+
         # Placeholder implementations:
-        
-        # Email example:
-        # await email_client.send(
-        #     to=recipient,
-        #     subject=subject,
-        #     body=message,
-        #     html=True
-        # )
-        
-        # Slack example:
-        # await slack_client.post_message(
-        #     channel=get_user_slack_channel(recipient),
-        #     text=message,
-        #     attachments=[{
-        #         "color": "good",
-        #         "title": subject,
-        #         "fields": [
-        #             {"title": "Incident ID", "value": incident.incident_id, "short": True},
-        #             {"title": "Confidence", "value": f"{incident.confidence_score:.2%}", "short": True}
-        #         ]
-        #     }]
-        # )
-        
+        # Email service, chat integrations, SMS, etc.
+
         # For now, just log it
         logger.debug(f"Notification content:\n{message}")
     
