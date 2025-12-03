@@ -15,12 +15,18 @@ from src.models.insight import (
     InsightsRequest, InsightsResponse, ServiceArea,
     InsightFeedback, AnomalyThresholdConfig
 )
+from src.models.insightbot import (
+    SuggestionResponse,
+    SuggestionFeedbackRequest,
+    SuggestionFeedback
+)
 from src.models.report import ReportRequest, ReportResponse
 from src.services.auto_resolution_service import AutoResolutionService
 from src.services.insights_service import InsightsService
 from src.services.audit_service import AuditService
 from src.services.notification_service import NotificationService
 from src.services.recommendation_service import RecommendationService
+from src.services.insightbot_service import InsightBotService
 from src.services.reporting_service import ReportingService
 
 logger = logging.getLogger(__name__)
@@ -48,6 +54,7 @@ class BusinessLogicAgent:
             notification_service=self.notification_service
         )
         self.insights = InsightsService()
+        self.insight_bot = InsightBotService()
         self.recommendations = RecommendationService(self.audit_service) if self.audit_service else None
         self.reporting = ReportingService(self.audit_service) if self.audit_service else None
         
@@ -195,6 +202,38 @@ class BusinessLogicAgent:
             max_recommendations=max_recommendations,
             min_success_rate=min_success_rate
         )
+    
+    async def get_insightbot_suggestions(
+        self,
+        incident: Incident,
+        max_suggestions: int = 3
+    ) -> SuggestionResponse:
+        """
+        Request InsightBot solution suggestions for an incident.
+        
+        Args:
+            incident: Incident requiring assistance
+            max_suggestions: Maximum number of InsightBot solutions to return
+        
+        Returns:
+            SuggestionResponse with suggested solutions
+        """
+        return await self.insight_bot.suggest_solutions(incident, limit=max_suggestions)
+    
+    async def submit_insightbot_feedback(
+        self,
+        feedback: SuggestionFeedbackRequest
+    ) -> SuggestionFeedback:
+        """
+        Submit agent feedback on InsightBot suggestions.
+        
+        Args:
+            feedback: Feedback request payload
+        
+        Returns:
+            Stored feedback record
+        """
+        return await self.insight_bot.record_feedback(feedback)
     
     async def generate_report(
         self,
