@@ -14,6 +14,7 @@ class ReportType(str, Enum):
     PERFORMANCE_METRICS = "performance_metrics"
     RECOMMENDATION_EFFECTIVENESS = "recommendation_effectiveness"
     CONFIGURATION_HISTORY = "configuration_history"
+    USAGE_REPORT = "usage_report"
 
 
 class TimeRange(str, Enum):
@@ -73,6 +74,7 @@ class ReportRequest(BaseModel):
     end_date: Optional[datetime] = None
     category_filter: Optional[str] = None
     priority_filter: Optional[str] = None
+    department_filter: Optional[str] = None
 
 
 class ReportResponse(BaseModel):
@@ -89,6 +91,8 @@ class ReportResponse(BaseModel):
     incident_trends: Optional[IncidentTrends] = None
     performance_metrics: Optional[PerformanceMetrics] = None
     recommendation_effectiveness: Optional[RecommendationEffectiveness] = None
+    login_frequency: Optional[Dict[str, int]] = None
+    feature_usage_statistics: Optional[Dict[str, Any]] = None
     
     metadata: Dict[str, Any] = Field(default_factory=dict)
     
