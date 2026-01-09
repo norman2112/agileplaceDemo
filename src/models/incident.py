@@ -27,6 +27,26 @@ class IncidentCategory(str, Enum):
     IOS_UPGRADE = "ios_upgrade"
 
 
+class IncidentType(str, Enum):
+    """Incident type classification."""
+    PERFORMANCE = "performance"
+    SECURITY = "security"
+    AVAILABILITY = "availability"
+    CONFIGURATION = "configuration"
+    CAPACITY = "capacity"
+    CONNECTIVITY = "connectivity"
+
+
+class IncidentSource(str, Enum):
+    """Data source where incident was detected."""
+    SERVER_LOGS = "server_logs"
+    APPLICATION_LOGS = "application_logs"
+    NETWORK_METRICS = "network_metrics"
+    SYSTEM_METRICS = "system_metrics"
+    SECURITY_ALERTS = "security_alerts"
+    CUSTOM_ALERTS = "custom_alerts"
+
+
 class IncidentPriority(str, Enum):
     """Incident priority levels."""
     LOW = "low"
@@ -53,10 +73,16 @@ class Incident(BaseModel):
     category: IncidentCategory
     priority: IncidentPriority
     status: IncidentStatus = IncidentStatus.OPEN
+    incident_type: Optional[IncidentType] = Field(None, description="Type of incident (performance, security, etc.)")
+    source: Optional[IncidentSource] = Field(None, description="Data source where incident was detected")
     confidence_score: float = Field(0.0, ge=0.0, le=1.0, description="ML confidence score for auto-resolution (0-1)")
+    detection_confidence: float = Field(0.0, ge=0.0, le=1.0, description="ML confidence in anomaly detection")
+    classification_confidence: float = Field(0.0, ge=0.0, le=1.0, description="ML confidence in classification")
+    auto_detected: bool = Field(default=False, description="Whether incident was auto-detected")
     created_by: str = Field(..., description="User ID of incident creator")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    detected_at: Optional[datetime] = Field(None, description="When incident was detected by AI")
     resolved_at: Optional[datetime] = None
     resolution_steps: List[ResolutionStep] = Field(default_factory=list)
     auto_resolved: bool = Field(default=False)
