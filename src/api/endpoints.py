@@ -3,6 +3,8 @@ from fastapi.responses import JSONResponse
 from src.services.user_service import update_user_profile
 from src.services.insights_service import InsightsService
 from src.services.widget_service import WidgetService
+from src.services.notification_service import NotificationService
+from src.services.audit_service import AuditService
 from src.models.user import UserProfile
 from src.models.insight import (
     InsightsRequest, InsightsResponse, InsightFeedback,
@@ -12,6 +14,10 @@ from src.models.widget import (
     Widget, WidgetCreateRequest, WidgetTemplate, WidgetStatus,
     WidgetApprovalRequest, WidgetValidationResult
 )
+from src.models.notification import (
+    ResolutionRatingRequest, ResolutionRatingResponse, ReopenIncidentRequest
+)
+from src.models.incident import Incident
 from typing import Optional, List, Dict
 from pydantic import BaseModel
 
@@ -23,6 +29,8 @@ app = FastAPI(
 
 insights_service = InsightsService()
 widget_service = WidgetService()
+audit_service = AuditService()
+notification_service = NotificationService(audit_service)
 
 class UserLogin(BaseModel):
     email: str
@@ -103,5 +111,30 @@ async def approve_widget(request: WidgetApprovalRequest):
 async def update_widget_position(widget_id: str, position: Dict[str, int]):
     try:
         return await widget_service.update_widget_position(widget_id, position)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/v1/incidents/{incident_id}/rate", response_model=ResolutionRatingResponse, tags=["Incidents"])
+async def rate_incident_resolution(incident_id: str, request: ResolutionRatingRequest):
+    """
+    Rate the quality of an incident resolution.
+    Allows users to provide feedback on auto-resolved incidents.
+    """
+    if incident_id != request.incident_id:
+        raise HTTPException(status_code=400, detail="Incident ID mismatch")
+    return await notification_service.rate_resolution(request)
+
+
+@app.post("/api/v1/incidents/{incident_id}/reopen", response_model=Incident, tags=["Incidents"])
+async def reopen_incident(incident_id: str, request: ReopenIncidentRequest):
+    """
+    Reopen a resolved incident if the issue persists.
+    Users can reopen incidents they believe were incorrectly resolved.
+    """
+    if incident_id != request.incident_id:
+        raise HTTPException(status_code=400, detail="Incident ID mismatch")
+    try:
+        return await notification_service.reopen_incident(request)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
