@@ -3,6 +3,8 @@ from fastapi.responses import JSONResponse
 from src.services.user_service import update_user_profile
 from src.services.insights_service import InsightsService
 from src.services.widget_service import WidgetService
+from src.services.audit_service import AuditService
+from src.services.pattern_detection_service import PatternDetectionService
 from src.models.user import UserProfile
 from src.models.insight import (
     InsightsRequest, InsightsResponse, InsightFeedback,
@@ -11,6 +13,9 @@ from src.models.insight import (
 from src.models.widget import (
     Widget, WidgetCreateRequest, WidgetTemplate, WidgetStatus,
     WidgetApprovalRequest, WidgetValidationResult
+)
+from src.models.pattern import (
+    IncidentPattern, PatternAnalysisRequest, PatternAnalysisResponse
 )
 from typing import Optional, List, Dict
 from pydantic import BaseModel
@@ -23,6 +28,8 @@ app = FastAPI(
 
 insights_service = InsightsService()
 widget_service = WidgetService()
+audit_service = AuditService()
+pattern_detection_service = PatternDetectionService(audit_service)
 
 class UserLogin(BaseModel):
     email: str
@@ -105,3 +112,36 @@ async def update_widget_position(widget_id: str, position: Dict[str, int]):
         return await widget_service.update_widget_position(widget_id, position)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/v1/patterns/analyze", response_model=PatternAnalysisResponse, tags=["Pattern Detection"])
+async def analyze_incident_patterns(request: PatternAnalysisRequest):
+    """Analyze an incident for matching patterns within 30 seconds."""
+    return await pattern_detection_service.analyze_incident(request)
+
+
+@app.get("/api/v1/patterns", response_model=List[IncidentPattern], tags=["Pattern Detection"])
+async def list_patterns():
+    """List all registered incident patterns."""
+    return pattern_detection_service.list_patterns()
+
+
+@app.get("/api/v1/patterns/{pattern_id}", response_model=IncidentPattern, tags=["Pattern Detection"])
+async def get_pattern(pattern_id: str):
+    """Get a specific pattern by ID."""
+    pattern = pattern_detection_service.get_pattern(pattern_id)
+    if not pattern:
+        raise HTTPException(status_code=404, detail="Pattern not found")
+    return pattern
+
+
+@app.post("/api/v1/patterns", response_model=IncidentPattern, tags=["Pattern Detection"])
+async def register_pattern(pattern: IncidentPattern):
+    """Register a new incident pattern."""
+    return pattern_detection_service.register_pattern(pattern)
+
+
+@app.get("/api/v1/patterns/statistics/summary", response_model=Dict, tags=["Pattern Detection"])
+async def get_pattern_statistics():
+    """Get pattern detection statistics."""
+    return pattern_detection_service.get_pattern_statistics()
