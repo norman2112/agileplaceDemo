@@ -1,50 +1,31 @@
 ## Summary
 
-Created headless Business Logic Agent for programmatic BL integration without web interface dependencies.
+- Added pattern detection service to automatically identify recurring incident patterns based on error messages, system components, and historical data
+- Implements analysis within 30-second timeout with confidence scoring
+- Triggers automated responses for high-confidence pattern matches (≥70-90% depending on pattern type)
+- Includes comprehensive audit logging for all pattern analysis activities
 
 ## Changes
 
-- **Added** `src/bl_agent.py`: Non-UI agent providing programmatic access to core business logic services
-  - Wraps auto-resolution, insights, recommendations, and reporting services
-  - Enables direct Python API usage without FastAPI/web server
-  - Factory function `create_agent()` for easy instantiation
-  - Configurable audit and notification support
+- **New `src/models/pattern.py`**: Data models for patterns, matches, and analysis requests/responses
+- **New `src/services/pattern_detection_service.py`**: Core service implementing pattern detection with 8 pre-configured common incident patterns
+- **Updated `src/models/audit.py`**: Added audit action types for pattern detection events
+- **Updated `src/services/audit_service.py`**: Added helper methods for pattern-related audit logging
+- **Updated `src/api/endpoints.py`**: Added REST API endpoints for pattern analysis and management
 
-## Key Features
+## API Endpoints
 
-- **Incident Resolution**: Direct programmatic incident resolution and status checking
-- **Insights Generation**: Generate analytics and insights without web endpoints
-- **Recommendations**: Get resolution recommendations programmatically
-- **Reporting**: Generate operational reports via code
-- **Configuration Management**: Control thresholds, categories, and kill switch
-- **Audit Trail**: Optional audit logging for all operations
+- `POST /api/v1/patterns/analyze` - Analyze an incident for matching patterns
+- `GET /api/v1/patterns` - List all registered patterns
+- `GET /api/v1/patterns/{pattern_id}` - Get a specific pattern
+- `POST /api/v1/patterns` - Register a new pattern
+- `GET /api/v1/patterns/statistics/summary` - Get pattern detection statistics
 
-## Usage Example
+## Test Plan
 
-```python
-from src.bl_agent import create_agent
-from src.models.incident import Incident, IncidentCategory, IncidentPriority
-
-# Create agent instance
-agent = create_agent()
-
-# Resolve an incident
-incident = Incident(
-    incident_id="INC-001",
-    title="Service Down",
-    description="API not responding",
-    category=IncidentCategory.APPLICATION,
-    priority=IncidentPriority.HIGH,
-    confidence_score=0.95,
-    created_by="user_123"
-)
-
-response = await agent.resolve_incident(incident)
-```
-
-## Technical Details
-
-- No FastAPI or uvicorn dependencies required
-- Async/await support maintained
-- All existing service integrations preserved
-- Backward compatible with existing codebase
+- [x] Pattern detection service imports successfully
+- [x] Pattern analysis completes within 30-second timeout
+- [x] Confidence scores calculated correctly
+- [x] High-confidence matches trigger automated responses
+- [x] Audit trail created for pattern matches
+- [x] All existing tests pass (37 tests)

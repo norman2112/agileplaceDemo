@@ -20,6 +20,9 @@ class AuditAction(str, Enum):
     RECOMMENDATION_REQUESTED = "recommendation_requested"
     RECOMMENDATIONS_GENERATED = "recommendations_generated"
     RECOMMENDATION_FEEDBACK = "recommendation_feedback"
+    PATTERN_ANALYSIS_STARTED = "pattern_analysis_started"
+    PATTERN_MATCH_FOUND = "pattern_match_found"
+    PATTERN_AUTO_RESPONSE_TRIGGERED = "pattern_auto_response_triggered"
 
 
 class AuditLogEntry(BaseModel):

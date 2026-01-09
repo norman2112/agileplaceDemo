@@ -3,7 +3,7 @@ Audit service - comprehensive logging of all auto-resolution actions.
 """
 import logging
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TYPE_CHECKING
 from uuid import uuid4
 
 from src.models.audit import AuditLogEntry, AuditAction, AuditQuery
@@ -294,5 +294,65 @@ class AuditService:
                 "recommendation_id": recommendation_id,
                 "rating": rating,
                 "was_successful": was_successful
+            }
+        )
+    
+    async def log_pattern_analysis_started(
+        self,
+        incident_id: str,
+        title: str,
+        category: Optional[str] = None
+    ) -> AuditLogEntry:
+        """Log that pattern analysis has started for an incident."""
+        return await self.log_entry(
+            incident_id=incident_id,
+            action=AuditAction.PATTERN_ANALYSIS_STARTED,
+            details={
+                "message": "Pattern analysis started",
+                "title": title,
+                "category": category
+            }
+        )
+    
+    async def log_pattern_match_found(
+        self,
+        incident_id: str,
+        pattern_id: str,
+        pattern_name: str,
+        confidence_score: float,
+        matched_keywords: List[str],
+        analysis_time_ms: int
+    ) -> AuditLogEntry:
+        """Log that a pattern match was found."""
+        return await self.log_entry(
+            incident_id=incident_id,
+            action=AuditAction.PATTERN_MATCH_FOUND,
+            confidence_score=confidence_score,
+            details={
+                "message": "Pattern match found",
+                "pattern_id": pattern_id,
+                "pattern_name": pattern_name,
+                "matched_keywords": matched_keywords,
+                "analysis_time_ms": analysis_time_ms
+            }
+        )
+    
+    async def log_pattern_auto_response_triggered(
+        self,
+        incident_id: str,
+        pattern_id: str,
+        pattern_name: str,
+        confidence_score: float
+    ) -> AuditLogEntry:
+        """Log that an automated response was triggered based on pattern match."""
+        return await self.log_entry(
+            incident_id=incident_id,
+            action=AuditAction.PATTERN_AUTO_RESPONSE_TRIGGERED,
+            confidence_score=confidence_score,
+            details={
+                "message": "Automated response triggered based on pattern match",
+                "pattern_id": pattern_id,
+                "pattern_name": pattern_name,
+                "trigger_reason": "High confidence pattern match"
             }
         )
