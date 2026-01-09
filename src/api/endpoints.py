@@ -3,6 +3,9 @@ from fastapi.responses import JSONResponse
 from src.services.user_service import update_user_profile
 from src.services.insights_service import InsightsService
 from src.services.widget_service import WidgetService
+from src.services.audit_service import AuditService
+from src.services.notification_service import NotificationService
+from src.services.incident_detection_service import IncidentDetectionService
 from src.models.user import UserProfile
 from src.models.insight import (
     InsightsRequest, InsightsResponse, InsightFeedback,
@@ -12,8 +15,9 @@ from src.models.widget import (
     Widget, WidgetCreateRequest, WidgetTemplate, WidgetStatus,
     WidgetApprovalRequest, WidgetValidationResult
 )
-from typing import Optional, List, Dict
-from pydantic import BaseModel
+from src.models.incident import Incident, IncidentSource
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field
 
 app = FastAPI(
     title="Incident Auto-Resolution System",
@@ -23,6 +27,9 @@ app = FastAPI(
 
 insights_service = InsightsService()
 widget_service = WidgetService()
+audit_service = AuditService()
+notification_service = NotificationService(audit_service)
+incident_detection_service = IncidentDetectionService(audit_service, notification_service)
 
 class UserLogin(BaseModel):
     email: str
@@ -105,3 +112,47 @@ async def update_widget_position(widget_id: str, position: Dict[str, int]):
         return await widget_service.update_widget_position(widget_id, position)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+class IncidentDetectionRequest(BaseModel):
+    """Request for incident detection from a data source."""
+    source: IncidentSource = Field(..., description="Data source type")
+    data: Dict[str, Any] = Field(..., description="Raw data from the source")
+    notify_teams: Optional[List[str]] = Field(None, description="Team IDs to notify")
+
+
+class BatchDetectionRequest(BaseModel):
+    """Batch detection request for multiple data sources."""
+    items: List[IncidentDetectionRequest] = Field(..., description="List of detection requests")
+
+
+@app.post("/api/v1/incidents/detect", response_model=Optional[Incident], tags=["Incident Detection"])
+async def detect_incident(request: IncidentDetectionRequest):
+    """
+    Analyze data from a source and detect/classify any incidents.
+    
+    Returns the created incident if anomaly detected, None otherwise.
+    """
+    incident = await incident_detection_service.detect_and_classify(
+        source=request.source,
+        data=request.data,
+        notify_teams=request.notify_teams
+    )
+    return incident
+
+
+@app.post("/api/v1/incidents/detect/batch", response_model=List[Incident], tags=["Incident Detection"])
+async def detect_incidents_batch(request: BatchDetectionRequest):
+    """
+    Process batch of data from multiple sources for incident detection.
+    
+    Returns list of created incidents for any anomalies detected.
+    """
+    data_batch = [(item.source, item.data) for item in request.items]
+    return await incident_detection_service.process_batch(data_batch)
+
+
+@app.get("/api/v1/incidents/sources", response_model=List[str], tags=["Incident Detection"])
+async def get_monitored_sources():
+    """Get list of monitored data sources."""
+    return [source.value for source in IncidentSource]
